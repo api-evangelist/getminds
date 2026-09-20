@@ -1,0 +1,132 @@
+generated: '2026-09-20'
+method: searched
+source: https://getminds.ai/docs/api/agents
+docs:
+- https://getminds.ai/docs/api/overview
+- https://getminds.ai/docs/api/agents
+- https://getminds.ai/docs/api/errors
+summary: >-
+  Minds is a Nuxt/Nitro (H3) REST API. Resource-oriented URLs under /api/v1,
+  JSON request/response bodies, bearer API-key auth, standard HTTP verbs and
+  status codes, durable async jobs with polling, and consistent error envelopes.
+auth_style:
+  scheme: bearer
+  header: Authorization
+  key_prefix: minds_
+  detail: See authentication/getminds-authentication.yml
+versioning:
+  style: uri-path
+  current: v1
+  base: https://getminds.ai/api/v1
+  alias: https://api.getminds.ai/v1
+  note: >-
+    Canonical base is the apex (/api/v1); api.getminds.ai/v1 is an alias mapping
+    onto the same routes. GET requests to the api subdomain may 307-redirect to
+    the apex; use the apex form if the client does not follow same-origin 307s.
+pagination:
+  styles:
+  - offset-limit
+  - cursor
+  params:
+  - limit
+  - offset
+  - after
+  - cursor
+  note: >-
+    List endpoints accept limit/offset; some cursor-based endpoints (e.g. model
+    connections, run events) return a `cursor`/`after` token to continue.
+error_envelope:
+  format: custom
+  rfc9457: false
+  fields:
+  - statusCode
+  - statusMessage
+  - message
+  - url
+  - error
+  - data
+  machine_code_field: data.code
+  detail: >-
+    Errors are a flat JSON object; branch on statusCode plus data.code
+    (e.g. "PLAN_LIMIT") and data.limitType rather than on statusMessage text.
+    data.expectedNoise is internal telemetry, not part of the contract.
+  reference: errors/getminds-problem-types.yml
+rate_limit_signaling:
+  headers:
+  - RateLimit-Limit
+  - RateLimit-Remaining
+  - Retry-After
+  status: 429
+  detail: See rate-limits/getminds-rate-limits.yml
+async_jobs:
+  pattern: start-then-poll
+  detail: >-
+    Several operations return before work completes and hand back a durable ID
+    to poll: sparkId -> GET /minds/{id}/training; audienceId -> GET
+    /audiences/{id}/progress; itemId -> GET /minds/{id}/knowledge/{itemId}/status;
+    runId -> GET /runs/{runId} (+ /events) or GET
+    /studies/{studyId}/research-runs/{runId}; jobId -> entity export-status then
+    export-download.
+  polling:
+  - Honor Retry-After when present.
+  - Otherwise start at 1-2s, exponential backoff to 10-15s, add jitter.
+  - Persist the last event cursor for /runs/{runId}/events.
+  streaming:
+  - GET /api/v1/audiences/lifecycle/stream
+  - GET /api/v1/runs/{runId}/events
+concurrency:
+  optimistic: true
+  detail: >-
+    Study drafts use optimistic concurrency: send the exact expectedRevision
+    from the last read; a stale revision is rejected (409) rather than
+    overwriting newer state.
+idempotency:
+  coverage: partial
+  scope:
+  - createAudienceFromBrief
+  - runStudyQuestions
+  mechanism: >-
+    No global Idempotency-Key header across the mutating surface.
+    createAudienceFromBrief derives an idempotency key from its arguments
+    (identical arguments replay the original Audience for ~6 hours);
+    runStudyQuestions accepts an explicit stable idempotency key via MCP, and
+    REST callers preserve the confirmed draft ID/revision and returned Study ID.
+    GETs are safe to retry on 429/5xx; other mutations are not idempotent.
+  header: null
+  retention: ~6h (createAudienceFromBrief)
+  source: https://getminds.ai/docs/api/agents
+reversibility:
+  status: partial
+  writes:
+  - operation: runStudyQuestions
+    reversal: cancelAgentRun
+    reversal_operation_id: cancelAgentRun
+    window: while running (before terminal state)
+    window_stated: true
+    grade: verified
+    source: https://getminds.ai/docs/api/agents
+    note: >-
+      POST /api/v1/runs/{runId}/cancel cancels an in-flight agent/study run.
+      Polling contract says to stop on terminal success, failure, or
+      cancellation, so cancel is only meaningful before the run terminates.
+  - operation: followAudience
+    reversal: unfollowAudience
+    reversal_operation_id: unfollowAudience
+    window: any time
+    window_stated: true
+    grade: verified
+    source: openapi/getminds-openapi.json
+  - operation: deleteMind / deleteAudience / deleteStudy / deleteChat / deleteFormation / deleteStudyDraft / deleteStudyTemplate
+    reversal: none
+    window: none
+    window_stated: false
+    grade: none
+    note: >-
+      Deletes are hard deletes (204 No Content); no restore/undo endpoint is
+      documented. The agent guide instructs confirming exact IDs immediately
+      before a destructive call and never retrying a delete blindly.
+  overall_grade: documented
+  note: >-
+    Some write surfaces have a documented reversal with a stated window (run
+    cancel, audience unfollow); the destructive delete surface has no documented
+    reversal. Recorded honestly per operation.

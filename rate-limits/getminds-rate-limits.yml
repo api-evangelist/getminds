@@ -1,0 +1,31 @@
+generated: '2026-09-20'
+method: searched
+source: https://getminds.ai/docs/api/errors
+limit_count: 1
+limits:
+- scope: per-account
+  window: 60s
+  window_type: fixed-window
+  limit: 300
+  burst: null
+  status_on_exhaustion: 429
+  note: >-
+    Default deployment ceiling is 300 requests/minute per account, but operators
+    can tune it and the limiter is per application instance and may fail open —
+    integrations must read the response headers rather than hard-code 300.
+response_headers:
+- name: RateLimit-Limit
+  description: Current per-minute ceiling for the active window.
+- name: RateLimit-Remaining
+  description: Requests remaining in the active window.
+- name: Retry-After
+  description: Seconds to wait after a 429 before retrying.
+observed_headers_in_spec:
+- X-RateLimit-Limit
+- X-RateLimit-Remaining
+- Retry-After
+plan_limits:
+  note: >-
+    Distinct from rate limiting: plan allowances (sparks/flows/messages/
+    groupMembers) surface as 403 PLAN_LIMIT or status plan_limited, not 429.
+    See errors/getminds-problem-types.yml and plans/getminds-plans-pricing.yml.

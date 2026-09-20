@@ -1,0 +1,54 @@
+generated: '2026-09-20'
+method: probed
+source: live probes of /.well-known/* on every known host
+hosts:
+- host: getminds.ai
+  documents:
+  - path: /.well-known/openid-configuration
+    status: 200
+    file: getminds-openid-configuration.json
+  - path: /.well-known/oauth-authorization-server
+    status: 200
+    file: getminds-oauth-authorization-server.json
+  - path: /.well-known/oauth-protected-resource
+    status: 200
+    file: getminds-oauth-protected-resource.json
+  - path: /.well-known/oauth-protected-resource/mcp
+    status: 200
+    file: getminds-oauth-protected-resource-mcp.json
+  - path: /.well-known/api-catalog
+    status: 200
+    file: getminds-api-catalog.json
+  - path: /.well-known/mcp/server-card.json
+    status: 200
+    file: getminds-mcp-server-card.json
+  - path: /.well-known/security.txt
+    status: 404
+  - path: /.well-known/ai-plugin.json
+    status: 404
+- host: api.getminds.ai
+  documents:
+  - path: /.well-known/openid-configuration
+    status: 200
+    file: getminds-api-openid-configuration.json
+  - path: /.well-known/oauth-authorization-server
+    status: 200
+    file: getminds-api-oauth-authorization-server.json
+  - path: /.well-known/oauth-protected-resource
+    status: 200
+    file: getminds-api-oauth-protected-resource.json
+  - path: /.well-known/api-catalog
+    status: 200
+    file: getminds-api-api-catalog.json
+  - path: /.well-known/security.txt
+    status: 404
+  - path: /.well-known/ai-plugin.json
+    status: 404
+- host: www.getminds.ai
+  documents:
+  - path: /.well-known/agent-card.json
+    status: 301
+    note: redirects to apex; no agent card served.
+notes:
+- No security.txt served on any host.
+- No A2A agent card served (agent-card.json / agent.json 404 on apex and api host).

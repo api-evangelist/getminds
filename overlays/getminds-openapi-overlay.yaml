@@ -1,0 +1,43 @@
+overlay: 1.0.0
+info:
+  title: API Evangelist enhancements for the Minds Public API
+  version: 1.0.0
+extends: openapi/getminds-openapi.json
+x-provenance:
+  generated: '2026-09-20'
+  method: generated
+  source: >-
+    Docs-sourced metadata (getminds.ai/docs/api/*, .well-known/*) not present in
+    the auto-generated OpenAPI document.
+actions:
+- target: $.info
+  description: Add contact, terms, and license metadata absent from the generated spec.
+  update:
+    contact:
+      name: Minds Support
+      email: support@getminds.ai
+      url: https://getminds.ai/docs/api/overview
+    termsOfService: https://getminds.ai/legal/terms
+- target: $.info
+  description: Record the documented default rate limit for the v1 API.
+  update:
+    x-rate-limit:
+      scope: per-account
+      default_limit: 300
+      window: 60s
+      headers: [RateLimit-Limit, RateLimit-Remaining, Retry-After]
+      status: 429
+      source: https://getminds.ai/docs/api/errors
+- target: $
+  description: Cross-link the companion MCP server and its published server card.
+  update:
+    x-mcp-server:
+      url: https://getminds.ai/mcp
+      transport: streamable-http
+      server_card: https://getminds.ai/.well-known/mcp/server-card.json
+      auth: [oauth2, apikey]
+- target: $.components.securitySchemes.ApiKeyAuth
+  description: Document the minds_ key prefix and management endpoint.
+  update:
+    x-key-prefix: minds_
+    x-key-management: https://getminds.ai/settings/api-keys

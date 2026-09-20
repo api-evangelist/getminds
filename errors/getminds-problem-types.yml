@@ -1,0 +1,97 @@
+generated: '2026-09-20'
+method: searched
+source: https://getminds.ai/docs/api/errors
+derived_from: openapi/getminds-openapi.json
+format: custom
+rfc9457: false
+envelope:
+  fields:
+  - name: statusCode
+    description: HTTP status code (authoritative for programmatic handling).
+  - name: statusMessage
+    description: Human-readable, per-error reason (wording may change).
+  - name: message
+    description: Same as statusMessage for v1 errors; extra context on 5xx debug builds.
+  - name: url
+    description: Request path (added by the Nuxt H3 framework).
+  - name: error
+    description: Always true on error responses (framework metadata).
+  - name: data
+    description: >-
+      Optional structured detail. data.code carries a stable machine code
+      (e.g. PLAN_LIMIT). data.expectedNoise is internal telemetry, not contract.
+status_codes:
+- code: 400
+  title: Bad Request
+  meaning: Invalid request parameters / schema violation.
+  action: Correct the payload; do not retry unchanged.
+- code: 401
+  title: Unauthorized
+  meaning: Missing/invalid/expired/revoked API key (generic, undifferentiated).
+  action: Stop and repair authentication; do not retry.
+- code: 402
+  title: Payment Required
+  meaning: Payment/subscription required for the operation.
+  action: Explain the required plan/billing change.
+- code: 403
+  title: Forbidden
+  meaning: Authenticated but not allowed, or plan limit reached (data.code=PLAN_LIMIT).
+  action: Explain access/ownership/plan boundary; branch on data.code.
+- code: 404
+  title: Not Found
+  meaning: Resource absent or not visible to the account.
+  action: Verify the persisted ID and account context.
+- code: 409
+  title: Conflict
+  meaning: Revision/idempotency/state conflict (e.g. stale draft expectedRevision).
+  action: Read current state and reconcile; do not overwrite with a guessed revision.
+- code: 413
+  title: Payload Too Large
+  meaning: Upload exceeds limits (knowledge files capped at 50MB).
+  action: Split or shrink the input.
+- code: 415
+  title: Unsupported Media Type
+  meaning: Wrong Content-Type (use application/json or multipart/form-data).
+  action: Correct the Content-Type / file form.
+- code: 422
+  title: Unprocessable Entity
+  meaning: Semantically invalid request.
+  action: Correct the request per validation detail.
+- code: 429
+  title: Too Many Requests
+  meaning: Rate or usage limit exceeded.
+  action: Honor Retry-After; distinguish rate limiting from plan_limited.
+- code: 500
+  title: Internal Server Error
+  meaning: Server-side error.
+  action: Bounded retry for safe/idempotent calls; otherwise read state first.
+- code: 502
+  title: Bad Gateway
+  meaning: Transient upstream failure.
+  action: Bounded retry for GETs.
+- code: 503
+  title: Service Unavailable
+  meaning: Service temporarily unavailable.
+  action: Bounded retry with backoff.
+machine_codes:
+- code: PLAN_LIMIT
+  http: 403
+  field: data.code
+  companion_fields:
+  - limitType   # sparks | flows | messages | groupMembers
+  - currentPlan # free | premium | team
+  - limit
+  - current
+  description: >-
+    Plan allowance exhausted. limitType names the exhausted allowance; currentPlan
+    is the caller's tier (Individual plan shows as "premium"). limit/current in an
+    authenticated response are authoritative for that request.
+- code: plan_limited
+  field: status / data
+  description: >-
+    Returned when a study/research run cannot start or stops mid-run due to plan
+    allowance. Before execution nothing started; during a study partial artifacts
+    are preserved — never report such a run as complete.
+notes:
+- No responses use application/problem+json; the envelope above is the contract.
+- data.expectedNoise appears on routine 401s and crawler-probe 404s; ignore it.

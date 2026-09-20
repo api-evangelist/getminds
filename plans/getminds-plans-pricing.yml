@@ -1,0 +1,41 @@
+generated: '2026-09-20'
+method: searched
+source: https://getminds.ai/pricing
+note: >-
+  Prices read from the schema.org Product/Offer JSON-LD embedded in the pricing
+  page (the visible table is JS-rendered). Billing is monthly (P1M), USD.
+  API access is a paid-plan capability; per-request allowances (sparks/flows/
+  messages/groupMembers) are enforced at runtime and vary by plan/contract — see
+  errors/getminds-problem-types.yml. In API payloads the Individual plan appears
+  as "premium"; tiers are free | premium | team.
+plan_count: 4
+currency: USD
+billing_period: month
+plans:
+- name: Free Plan
+  api_tier: free
+  price: 0
+  currency: USD
+  period: month
+  description: Get started with Minds for free.
+- name: Individual Plan
+  api_tier: premium
+  price: 59
+  currency: USD
+  period: month
+  description: For power users and professionals.
+- name: Team Plan
+  api_tier: team
+  price: 99
+  currency: USD
+  period: month
+  per_seat: true
+  description: Per seat, for teams and enterprises.
+- name: Enterprise
+  api_tier: enterprise
+  price: null
+  currency: USD
+  period: null
+  description: >-
+    Custom contract for enterprise research workflows (contact sales); contract
+    overrides to allowances and features take precedence over public defaults.

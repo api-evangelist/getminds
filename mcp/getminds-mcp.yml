@@ -1,0 +1,124 @@
+generated: '2026-09-20'
+method: searched
+status: published
+source: https://getminds.ai/.well-known/mcp/server-card.json
+docs: https://getminds.ai/mcp/overview
+deployment:
+  mode: remote
+  endpoint: https://getminds.ai/mcp
+  transport: streamable-http
+  auth: oauth
+  verified: probed
+  note: >-
+    Live remote MCP server. tools/list returns 401 AUTHENTICATION_REQUIRED
+    (OAuth or Minds API key) when called anonymously, but the full tool set with
+    input schemas is published unauthenticated in the server card at
+    /.well-known/mcp/server-card.json — captured verbatim in
+    well-known/getminds-mcp-server-card.json and summarized below.
+server:
+  name: minds-ai
+  title: 'Minds: Synthetic Market Research'
+  version: '2.0.0'
+  description: >-
+    Build synthetic Audiences and run Studies for concept testing, message
+    testing, and segment comparison.
+  transport: streamable-http
+  endpoint: https://getminds.ai/mcp
+  icon: https://getminds.ai/android-chrome-512x512.png
+  server_card: well-known/getminds-mcp-server-card.json
+auth:
+  methods:
+  - oauth2
+  - apikey
+  oauth2:
+    required: true
+    authorization_server: https://getminds.ai
+    protected_resource: https://getminds.ai/mcp
+    protected_resource_metadata: well-known/getminds-oauth-protected-resource.json
+    scopes_supported:
+    - sparks:read
+    - sparks:write
+    - sparks:chat
+    - flows:read
+    - flows:write
+    pkce: S256
+    dynamic_client_registration: true
+  apikey:
+    header: Authorization
+    format: 'Bearer minds_…'
+tool_count: 23
+advertised_tool_count: 22
+note_tools: >-
+  The server card publishes 23 tools with full JSON input schemas. The docs
+  describe "22 advertised and 39 canonical" tools; some lifecycle tools are not
+  advertised for discovery. Schemas below are the published server-card schemas.
+tools:
+- name: create_study
+  category: study
+  title: Create a Study
+- name: ask_study
+  category: study
+  title: Ask One Standalone Question in a Study
+- name: export_study
+  category: export
+  title: Export Study Results
+- name: export_mind
+  category: export
+  title: Export Mind Persona Profile
+- name: export_audience
+  category: export
+  title: Export Audience Brief
+- name: export_heatmap
+  category: export
+  title: Export Website Heatmap
+- name: study_heatmap
+  category: study
+  title: Study Asset Heatmap
+- name: list_studies
+  category: study
+  title: List Studies
+- name: get_study_status
+  category: study
+  title: Get Study Status
+- name: list_audiences
+  category: audience
+  title: List Audiences
+- name: get_audience_limits
+  category: audience
+  title: Get Audience Limits
+- name: create_audience_from_brief
+  category: audience
+  title: Create a Grounded Audience from a Brief
+- name: import_audience_sources
+  category: audience
+  title: Import Audience Research Sources
+- name: ask_audience
+  category: audience
+  title: Ask One Standalone Audience Question
+- name: plan_study_questions
+  category: research
+  title: Plan a Multi-Question Block in a Study
+- name: run_study_questions
+  category: research
+  title: Run a Confirmed Multi-Question Block
+- name: get_study_run
+  category: research
+  title: Get Multi-Question Run Status
+- name: list_research_methods
+  category: research
+  title: List Research Methods
+- name: list_study_drafts
+  category: research
+  title: List Study Drafts
+- name: save_study_draft
+  category: research
+  title: Save Study Draft
+- name: list_study_templates
+  category: study
+  title: List Study Templates
+- name: manage_study_template
+  category: study
+  title: Manage Study Template
+- name: get_study_summary
+  category: study
+  title: Get Study Summary

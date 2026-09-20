@@ -1,0 +1,28 @@
+generated: '2026-09-20'
+method: searched
+source: https://getminds.ai/.well-known/oauth-authorization-server
+docs: https://getminds.ai/mcp/setup
+note: >-
+  OAuth scopes apply to the Minds MCP server (protected resource
+  https://getminds.ai/mcp). The REST v1 API authenticates with a personal API
+  key and declares no oauth2 scopes. Scopes below are read verbatim from the
+  provider's published authorization-server and protected-resource metadata.
+authorization_server: https://getminds.ai
+resource: https://getminds.ai/mcp
+scopes:
+- name: openid
+  description: OpenID Connect subject/identity.
+- name: email
+  description: Authenticated account email and verification status.
+- name: profile
+  description: Authenticated account profile claims.
+- name: sparks:read
+  description: Read Minds ("sparks") and Audiences.
+- name: sparks:write
+  description: Create and modify Minds ("sparks") and Audiences.
+- name: sparks:chat
+  description: Run chat/completion and research against Minds and Audiences.
+- name: flows:read
+  description: Read Studies, chats, drafts, runs and research flows.
+- name: flows:write
+  description: Create and run Studies, chats, drafts and research flows.

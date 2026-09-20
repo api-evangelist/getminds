@@ -1,0 +1,21 @@
+generated: '2026-09-20'
+method: searched
+source: >-
+  npm registry search, https://getminds.ai/docs/api/openapi
+official_sdk_count: 0
+packages: []
+note: >-
+  Minds publishes no first-party client SDK. The OpenAPI guide explicitly directs
+  developers to generate a typed client from https://getminds.ai/_openapi.json
+  with a standard generator (openapi-typescript + openapi-fetch, openapi-generator,
+  orval, kubb). npm search for "getminds"/"@getminds" and candidate names returns
+  no first-party package (the unrelated "@minds/sdk" belongs to a different Minds
+  and is not this provider — not recorded). A generated (3.0.2) spec view is also
+  published at https://getminds.ai/_openapi-3.0.json for importers such as RapidAPI.
+generation:
+  from_openapi: https://getminds.ai/_openapi.json
+  recommended:
+  - openapi-typescript
+  - openapi-generator
+  - orval
+  - kubb

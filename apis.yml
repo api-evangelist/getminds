@@ -1,0 +1,177 @@
+name: Minds
+aid: getminds
+description: >-
+  Minds (getminds.ai) is an end-to-end platform for commercial synthetic market
+  research. Brand, agency, product and insights teams build reusable AI Audiences
+  grounded in their own research and public sources, then run in-depth interviews,
+  questionnaires, concept and message tests, MaxDiff/conjoint methods, and segment
+  comparisons in a single Study — from audience creation through analysis and
+  export. Minds ships a public v1 REST API (OpenAPI 3.1.0, 103 operations), a
+  hosted MCP server (23 published tools, OAuth 2.0 / API key), and an agent
+  integration guide. Operated by Art of X UG (Berlin, Germany) with EU (Frankfurt/
+  Stockholm) data residency and a full GDPR posture.
+tags:
+- Synthetic Research
+- Market Research
+- Surveys
+- User Research
+- Marketing Analytics
+- AI Personas
+- MCP
+- agent-native
+- GDPR
+tags_raw:
+- synthetic-research
+- market-research
+- surveys
+- user-research
+- marketing-analytics
+- ai-personas
+- mcp
+- agent-native
+- gdpr
+image: https://getminds.ai/images/preview.webp
+url: https://raw.githubusercontent.com/api-evangelist/getminds/refs/heads/main/apis.yml
+created: '2026-09-20'
+modified: '2026-09-20'
+apis:
+- name: Minds Public API
+  description: >-
+    REST v1 API for Minds (AI personas), Audiences, Studies, knowledge, chat,
+    research runs, analytics and exports. JSON over HTTPS, bearer API-key auth
+    (minds_ prefix), durable async jobs with polling, and a consistent error
+    envelope. OpenAPI 3.1.0 with 103 operations.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Synthetic Research
+  - Market Research
+  - AI Personas
+  - agent-native
+  tags_raw:
+  - synthetic-research
+  - market-research
+  - ai-personas
+  - agent-native
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-openapi.json
+  - type: OpenAPI
+    url: https://getminds.ai/_openapi.json
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+  - type: Overlay
+    url: overlays/getminds-openapi-overlay.yaml
+- name: Minds MCP Server
+  description: >-
+    Hosted, agent-native MCP server (streamable-http) exposing 23 published tools
+    for creating grounded Audiences, planning and running multi-question Studies,
+    asking standalone questions, heatmaps, summaries and exports. Auth via OAuth
+    2.0 (PKCE + dynamic client registration) or a Minds API key.
+  humanURL: https://getminds.ai/mcp/overview
+  baseURL: https://getminds.ai/mcp
+  tags:
+  - MCP
+  - agent-native
+  - Synthetic Research
+  tags_raw:
+  - mcp
+  - agent-native
+  - synthetic-research
+  properties:
+  - type: MCPServer
+    url: mcp/getminds-mcp.yml
+  - type: MCPServer
+    url: https://getminds.ai/mcp
+  - type: ToolCrosswalk
+    url: mcp/getminds-tool-crosswalk.yml
+  - type: OAuthScopes
+    url: scopes/getminds-scopes.yml
+  - type: Documentation
+    url: https://getminds.ai/mcp/tools
+common:
+- type: Website
+  url: https://getminds.ai
+- type: DeveloperPortal
+  url: https://getminds.ai/docs/api/overview
+- type: Documentation
+  url: https://getminds.ai/docs/api/overview
+- type: APIReference
+  url: https://getminds.ai/docs/api/reference
+- type: GettingStarted
+  url: https://getminds.ai/docs/api/overview
+- type: Support
+  url: https://getminds.ai/guide
+- type: Blog
+  url: https://getminds.ai/blog
+- type: Pricing
+  url: https://getminds.ai/pricing
+- type: SignUp
+  url: https://getminds.ai/settings/api-keys
+- type: TermsOfService
+  url: https://getminds.ai/legal/terms
+- type: PrivacyPolicy
+  url: https://getminds.ai/legal/dataprivacy
+- type: StatusPage
+  url: lifecycle/getminds-lifecycle.yml
+- type: MCPServer
+  url: mcp/getminds-mcp.yml
+- type: ToolCrosswalk
+  url: mcp/getminds-tool-crosswalk.yml
+- type: OAuthScopes
+  url: scopes/getminds-scopes.yml
+- type: LLMsTxt
+  url: llms/getminds-llms.txt
+- type: WellKnown
+  url: well-known/getminds-well-known.yml
+- type: Authentication
+  url: authentication/getminds-authentication.yml
+- type: Conventions
+  url: conventions/getminds-conventions.yml
+- type: Idempotency
+  url: conventions/getminds-conventions.yml
+- type: Conformance
+  url: conformance/getminds-conformance.yml
+- type: ErrorCatalog
+  url: errors/getminds-problem-types.yml
+- type: DataModel
+  url: data-model/getminds-data-model.yml
+- type: Lifecycle
+  url: lifecycle/getminds-lifecycle.yml
+- type: DomainSecurity
+  url: security/getminds-domain-security.yml
+- type: RateLimits
+  url: rate-limits/getminds-rate-limits.yml
+- type: Plans
+  url: plans/getminds-plans-pricing.yml
+- type: Packages
+  url: packages/getminds-packages.yml
+- type: AgentSkill
+  url: skills/_index.yml
+- type: Subprocessors
+  url: regulatory/getminds-regulatory-posture.yml
+- type: DataResidency
+  url: regulatory/getminds-regulatory-posture.yml
+- type: DataSubjectRequest
+  url: regulatory/getminds-regulatory-posture.yml
+maintainers:
+- FN: Minds
+  email: support@getminds.ai
+  url: https://getminds.ai
+x-enrichment:
+  date: '2026-09-20'
+  status: enriched
+  artifacts_added: 20
+  pass: local-v3

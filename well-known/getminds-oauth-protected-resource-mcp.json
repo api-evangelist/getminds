@@ -1,0 +1,1 @@
+{"resource":"https://getminds.ai/mcp","authorization_servers":["https://getminds.ai"],"scopes_supported":["sparks:read","sparks:write","sparks:chat","flows:read","flows:write"],"resource_documentation":"https://getminds.ai/mcp/setup"}

@@ -1,0 +1,13 @@
+generated: '2026-09-20'
+method: generated
+source: >-
+  Grounded in openapi/getminds-openapi.json operationIds and the provider agent
+  guide https://getminds.ai/docs/api/agents
+provider_agent_guide: https://getminds.ai/docs/api/agents
+skills:
+- name: getminds-audience-to-study
+  file: skills/getminds-audience-to-study.md
+  description: Build a grounded Audience from a brief, run a Study, and export the report.
+- name: getminds-ask-study
+  file: skills/getminds-ask-study.md
+  description: Ask one standalone question of an existing Study's Audiences.

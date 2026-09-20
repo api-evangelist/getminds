@@ -1,0 +1,33 @@
+generated: '2026-09-20'
+method: searched
+source: https://getminds.ai/docs/api/errors
+versioning:
+  scheme: uri-path
+  current: v1
+  policy_url: https://getminds.ai/docs/api/openapi
+  note: >-
+    Single stable major (v1). The OpenAPI document is generated from route
+    metadata via Nitro's experimental openAPI flag; format is stable (OpenAPI
+    3.1.0) but operation-metadata structure may drift, so consumers are advised
+    to pin client generation to a build artifact. A 3.0.2 compatibility view is
+    published at /_openapi-3.0.json.
+deprecation:
+  policy: none_published
+  headers_documented: false
+  deprecated_operations: []
+  note: >-
+    No deprecation/sunset policy or RFC 8594 Deprecation/Sunset headers found in
+    the docs, and no operation in the OpenAPI document is marked deprecated.
+status_page:
+  url: https://uptime.getminds.ai
+  verified: true
+  status_at_probe: ok
+  health_endpoint: https://getminds.ai/api/health
+  note: >-
+    Public uptime page at uptime.getminds.ai; a machine health endpoint at
+    /api/health returns {"status":"ok"} and is linked from the api-catalog.
+support:
+  email: support@getminds.ai
+  social: https://x.com/mindsai_co
+sla:
+  published: false

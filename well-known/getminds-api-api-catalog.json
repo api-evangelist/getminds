@@ -1,0 +1,34 @@
+{
+  "linkset": [
+    {
+      "anchor": "https://api.getminds.ai/api",
+      "service-doc": [
+        {
+          "href": "https://api.getminds.ai/docs/api/overview",
+          "type": "text/html",
+          "title": "Minds API documentation"
+        },
+        {
+          "href": "https://api.getminds.ai/docs/api/overview.md",
+          "type": "text/markdown",
+          "title": "Minds API documentation (Markdown)"
+        }
+      ],
+      "status": [
+        {
+          "href": "https://api.getminds.ai/api/health"
+        }
+      ],
+      "related": [
+        {
+          "href": "https://api.getminds.ai/mcp",
+          "title": "Minds MCP server"
+        },
+        {
+          "href": "https://api.getminds.ai/.well-known/mcp/server-card.json",
+          "title": "MCP server card"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+generated: '2026-09-20'
+method: derived
+source: openapi/getminds-openapi.json
+note: >-
+  Entity-relationship graph derived from the OpenAPI path hierarchy, path/id
+  parameters, and 109 component schemas. Relationships reflect id-reference
+  fields (mindId, audienceId, studyId, mindIds, audienceIds, messageId) and the
+  nesting of resource paths under /api/v1.
+entities:
+- name: Mind
+  aka: spark
+  id_field: mindId
+  id_alias: sparkId
+  schemas: [MindDetail, MindSummary, MindPattern]
+  description: An AI persona ("Mind"/"spark") built from a brief, keywords, or a cloned profile.
+- name: KnowledgeItem
+  id_field: itemId
+  parent: Mind
+  schemas: [KnowledgeItem, KnowledgeItemProcessing, KnowledgePatternFramework]
+  description: A file/link/keyword knowledge source attached to and training a Mind.
+- name: Audience
+  id_field: audienceId
+  schemas: [AudienceDetail, AudienceMindSummary, AudienceGrounding, AudienceSourceRecord]
+  description: A reusable cohort of Minds, grounded in research and public sources.
+- name: Formation
+  id_field: formationId
+  parent: Audience
+  schemas: [Formation, FormationSubgroup, FormationHypothesis, FormationBuildProgress]
+  description: A structured segmentation/subgroup breakdown computed over an Audience.
+- name: Study
+  id_field: studyId
+  schemas: [StudyAnswerProvenance, StudyAskAnswerEvent]
+  description: A research workspace that attaches Audiences and runs questions.
+- name: StudyDraft
+  id_field: draftId
+  parent: Study
+  description: A durable, versioned research-plan draft (optimistic-concurrency revision).
+- name: StudyTemplate
+  id_field: id
+  description: A reusable Study template that can be instantiated into a new Study.
+- name: Run
+  id_field: runId
+  parent: Study
+  description: A durable research run (direct or confirmed multi-question) with events.
+- name: Chat
+  id_field: chatId
+  schemas: [ChatCreated, ChatMessageResponse, ChatStudyCreated]
+  description: A stateful single-Mind, multi-Mind, or Study chat session.
+- name: Message
+  id_field: messageId
+  parent: [Chat, Study]
+  description: An individual message/answer within a chat or study, with provenance.
+- name: ApiKey
+  id_field: keyId
+  schemas: [ApiKeySummary, ApiKeyCreated]
+  description: A personal API credential (minds_ prefix), shown once at creation.
+- name: ModelConnection
+  description: A team's verified model provider connection (credentials excluded).
+- name: User
+  id_field: userId
+  description: The authenticated account (GET /auth/me), with plan context.
+relationships:
+- { from: Audience, type: has_many, to: Mind, via: mindIds (members) }
+- { from: Audience, type: has_many, to: Formation, via: audienceId }
+- { from: Mind, type: has_many, to: KnowledgeItem, via: mindId }
+- { from: Study, type: has_many, to: Audience, via: audienceIds }
+- { from: Study, type: has_many, to: Run, via: studyId }
+- { from: Study, type: has_many, to: Message, via: studyId }
+- { from: Study, type: has_many, to: StudyDraft, via: studyId }
+- { from: StudyTemplate, type: has_many, to: Study, via: instantiation }
+- { from: Chat, type: has_many, to: Message, via: chatId }
+- { from: Chat, type: references, to: Mind, via: mindIds }
+- { from: Chat, type: references, to: Study, via: studyId }
+- { from: User, type: has_many, to: ApiKey, via: userId }
+- { from: User, type: has_many, to: Mind, via: createdByUserId }
+id_prefixes_note: >-
+  Public share links use publicShareId; idempotency/tracing use requestId,
+  clientRequestId and startRequestId.

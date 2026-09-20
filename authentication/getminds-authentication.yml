@@ -1,0 +1,59 @@
+generated: '2026-09-20'
+method: searched
+source: https://getminds.ai/docs/api/authentication
+summary:
+  types:
+  - http
+  - oauth2
+  note: >-
+    REST v1 API uses a personal API key sent as a bearer token. The MCP server
+    (https://getminds.ai/mcp) is a separate protected resource that uses OAuth 2.0
+    (or the same API key). The OpenAPI document itself is intentionally public.
+schemes:
+- name: ApiKeyAuth
+  surface: rest
+  type: http
+  scheme: bearer
+  bearerFormat: API Key
+  key_prefix: minds_
+  header: Authorization
+  description: >-
+    Personal API key sent as `Authorization: Bearer minds_…`. Keys are prefixed
+    `minds_`, created at https://getminds.ai/settings/api-keys, shown once at
+    creation, and never returned again. `GET /api/v1/auth/me` verifies a key.
+    A missing/invalid/revoked key returns a generic 401 (the API deliberately
+    does not distinguish among them).
+  docs: https://getminds.ai/docs/api/authentication
+  sources:
+  - openapi/getminds-openapi.json
+  - https://getminds.ai/docs/api/authentication
+- name: MCP OAuth2
+  surface: mcp
+  type: oauth2
+  flow: authorization_code
+  pkce: S256
+  dynamic_client_registration: true
+  token_endpoint_auth_methods:
+  - none
+  authorization_endpoint: https://getminds.ai/oauth/authorize
+  token_endpoint: https://getminds.ai/oauth/token
+  registration_endpoint: https://getminds.ai/oauth/register
+  revocation_endpoint: https://getminds.ai/oauth/revoke
+  protected_resource: https://getminds.ai/mcp
+  scopes:
+  - sparks:read
+  - sparks:write
+  - sparks:chat
+  - flows:read
+  - flows:write
+  description: >-
+    RFC 9728 protected-resource metadata is served at
+    /.well-known/oauth-protected-resource; the authorization server metadata
+    (RFC 8414) and OpenID configuration are served on the same host. Public
+    client (token_endpoint_auth_method none) with PKCE and dynamic client
+    registration. The MCP server also accepts a Minds API key in place of OAuth.
+  docs: https://getminds.ai/mcp/setup
+  sources:
+  - well-known/getminds-oauth-authorization-server.json
+  - well-known/getminds-oauth-protected-resource.json
+  - well-known/getminds-openid-configuration.json

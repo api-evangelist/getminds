@@ -1,0 +1,149 @@
+generated: '2026-09-20'
+method: derived
+source: >-
+  mcp/getminds-mcp.yml (well-known/getminds-mcp-server-card.json) bound to
+  openapi/getminds-openapi.json operationIds
+note: >-
+  Each MCP tool is bound to its backing v1 REST operation(s) by name and
+  semantics. The live MCP schema is OAuth-gated, but the server card publishes
+  each tool's inputSchema; bindings below are high confidence where an
+  operationId matches one-to-one and lower where the tool is a composite.
+surfaces:
+  openapi: openapi/getminds-openapi.json
+  mcp:
+    url: https://getminds.ai/mcp
+    gated: true
+crosswalk:
+- tool: create_study
+  category: study
+  rest: [createStudy]
+  binding: direct
+  confidence: high
+- tool: ask_study
+  category: study
+  rest: [askStudy, createStudyRun]
+  binding: direct
+  confidence: high
+  note: Standalone question via /ask; durable direct run via /runs.
+- tool: export_study
+  category: export
+  rest: [exportStudy, getStudyExportStatus, downloadStudyExport]
+  binding: composite
+  confidence: high
+- tool: export_mind
+  category: export
+  rest: [exportMindPersona, getMindExportStatus, downloadMindExport]
+  binding: composite
+  confidence: high
+- tool: export_audience
+  category: export
+  rest: [exportAudienceBrief, getAudienceExportStatus, downloadAudienceExport]
+  binding: composite
+  confidence: high
+- tool: export_heatmap
+  category: export
+  rest: [exportStudyWebsiteHeatmap, getStudyWebsiteHeatmapExportStatus, downloadStudyWebsiteHeatmapExport]
+  binding: composite
+  confidence: high
+- tool: study_heatmap
+  category: study
+  rest: [startStudyHeatmap, getStudyHeatmap]
+  binding: composite
+  confidence: high
+- tool: list_studies
+  category: study
+  rest: [listStudies]
+  binding: direct
+  confidence: high
+- tool: get_study_status
+  category: study
+  rest: [getStudy]
+  binding: direct
+  confidence: high
+- tool: list_audiences
+  category: audience
+  rest: [listAudiences, listAudienceLibrary]
+  binding: direct
+  confidence: high
+- tool: get_audience_limits
+  category: audience
+  rest: [getAudienceLimits]
+  binding: direct
+  confidence: high
+- tool: create_audience_from_brief
+  category: audience
+  rest: [createAudienceFromBrief, getAudienceFromBriefCreationJob]
+  binding: composite
+  confidence: high
+- tool: import_audience_sources
+  category: audience
+  rest: [importAudienceSources]
+  binding: direct
+  confidence: high
+- tool: plan_study_questions
+  category: research
+  rest: [previewStudyResearchPlan]
+  binding: direct
+  confidence: high
+- tool: run_study_questions
+  category: research
+  rest: [runStudyQuestions, getStudyResearchStudy]
+  binding: composite
+  confidence: high
+- tool: get_study_run
+  category: research
+  rest: [getStudyResearchStudy, getAgentRun]
+  binding: direct
+  confidence: medium
+- tool: list_research_methods
+  category: research
+  rest: [listResearchMethods]
+  binding: direct
+  confidence: high
+- tool: list_study_drafts
+  category: research
+  rest: [listStudyDrafts, getStudyDraft]
+  binding: direct
+  confidence: high
+- tool: save_study_draft
+  category: research
+  rest: [createStudyDraft, updateStudyDraft]
+  binding: composite
+  confidence: high
+- tool: list_study_templates
+  category: study
+  rest: [listStudyTemplates, getStudyTemplate]
+  binding: direct
+  confidence: high
+- tool: manage_study_template
+  category: study
+  rest: [saveStudyTemplate, updateStudyTemplate, deleteStudyTemplate, instantiateStudyTemplate]
+  binding: composite
+  confidence: high
+- tool: get_study_summary
+  category: study
+  rest: [getStudySemanticSummary, refreshStudySemanticSummary]
+  binding: composite
+  confidence: high
+mcp_only:
+- tool: ask_audience
+  reason: >-
+    Composite convenience — asks one standalone question of an Audience without a
+    persisted Study; no single public REST operation implements it (closest REST
+    path is to create a Study and use askStudy/createStudyRun).
+rest_only:
+- { category: minds, operations: [listMinds, listMindLibrary, getMind, createMind, updateMind, deleteMind, deleteMinds, regenerateMindPrompt, regenerateMindImage, regenerateMindEmbeddings, retrainMind, getMindTrainingStatus, listMindPatterns, getMindKnowledgePatterns] }
+- { category: knowledge, operations: [listMindKnowledge, addMindKnowledge, updateMindKnowledgeItem, deleteMindKnowledgeItem, enrichMindKnowledge, getMindKnowledgeItemStatus] }
+- { category: chat, operations: [createChat, sendChatMessage, deleteChat, createMindCompletion] }
+- { category: audience, operations: [createAudience, getAudience, updateAudience, deleteAudience, getAudienceProgress, listActiveAudienceProgress, followAudience, unfollowAudience, addAudienceMembers, removeAudienceMember, recalibrateAudience, regenerateAudienceImages, previewCohortAllocation, previewAudienceDatasetSegmentation, streamAudienceLifecycle] }
+- { category: formation, operations: [listFormations, createFormation, getFormation, deleteFormation, previewFormation, recomputeFormation] }
+- { category: study, operations: [deleteStudy, getStudyAnalytics, getStudyMessageAnswers, updateStudySharing, inviteStudyCollaborators, listStudyRuns, consumeStudyDraft, deleteStudyDraft] }
+- { category: runs, operations: [getAgentRun, listAgentRunEvents, cancelAgentRun] }
+- { category: account, operations: [getAuthenticatedUser, listApiKeys, createApiKey, deleteApiKey, listModelConnections, getOpenApiDocument] }
+coverage:
+  mcp_tools: 23
+  mcp_tools_bound_to_rest: 22
+  mcp_only: 1
+  rest_operations_total: 103
+  rest_operations_with_tool: 33
+  rest_only: 70

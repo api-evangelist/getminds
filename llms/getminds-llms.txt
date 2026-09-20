@@ -1,0 +1,101 @@
+# Minds - Synthetic Market Research Platform
+
+> Minds is a synthetic market research platform for brand, agency and insights teams. Build reusable AI Audiences grounded in your own research and public sources, then run interviews, questionnaires, concept and message tests, and segment comparisons in one Study.
+
+## Documentation Sets
+
+- [Minds — Complete Documentation](https://getminds.ai/llms-full.txt): Comprehensive documentation of the Minds platform including guides, features, and legal information.
+
+## Key Resources
+
+Essential links and information about the Minds platform
+
+- [Home](/): Minds homepage
+- [About](/about): Team, research principles, and partner ecosystem behind Minds
+- [Pricing](/pricing): Public plans and pricing for Minds
+- [Audience Marketplace](/marketplace): Public catalog of ready-made Audiences grouped by industry, usable without building one first. Alongside Minds-built Audiences it carries Audiences published by research institutes under their own name — the SINUS-Milieus from SINUS-Institut are available there by subscription.
+- [Best Synthetic Market Research Platforms](/blog/best-synthetic-market-research-tools-2026): Buyer guide comparing Minds, GWI, Artificial Societies, Qualtrics, and other synthetic research approaches
+- [Methodology](/research/methodology): How Minds builds, grounds, and validates directional synthetic research
+- [Guides](/guide): Learn how to use Minds features
+- [Terms of Service](/legal/terms): Platform terms and conditions
+- [Privacy Policy](/legal/dataprivacy): Privacy policy and data protection
+
+## Who Minds is for
+
+Who Minds is for. Brand, marketing and product teams (/for/brands); advertising, creative and strategy agencies working for clients (/for/agencies); and research institutes, panel providers and data partners (/for/research-partners). Teams who only want a ready-made Audience start at /marketplace instead.
+
+- [Minds for Brands](/for/brands): Voice of customer for brand, marketing, strategy, and product/UX teams: test campaigns and concepts, compare audience segments, and explore the stories behind survey data without a panel budget.
+- [Minds for Brands (Markdown)](/for/brands.md): The same page as plain Markdown, about 700 words instead of ~590 KB of HTML.
+- [Minds for Agencies](/for/agencies): Validated audience insight across the agency workflow: client briefs, research strategy, concept development, creative review, and final campaign pretesting before delivery.
+- [Minds for Agencies (Markdown)](/for/agencies.md): The same page as plain Markdown, for agents that prefer it to HTML.
+- [Minds for Research Partners](/for/research-partners): For research institutes and data partners: turn proprietary research, methodology, and segments into reusable synthetic Audiences, and publish them as attributed Marketplace add-ons.
+- [Minds for Research Partners (Markdown)](/for/research-partners.md): The same page as plain Markdown, for agents that prefer it to HTML.
+
+## Comparisons and alternatives
+
+How Minds compares with panels, survey tools and other synthetic-research approaches. Useful for "best synthetic research platform" and "X vs Y" questions.
+
+- [Comparison hub](/comparison): Every published Minds comparison, including synthetic-research platforms, traditional panels, conjoint and split testing.
+- [Comparison hub (Markdown)](/comparison.md): The same index as plain Markdown.
+- [Best Synthetic Market Research Platforms](/blog/best-synthetic-market-research-tools-2026): Buyer guide comparing Minds, GWI, Artificial Societies, Qualtrics, and other synthetic research approaches.
+
+## Evidence and validation
+
+Where the accuracy claims come from. Minds compares synthetic answers with real survey data and publishes the comparisons rather than asserting a number.
+
+- [Methodology](/research/methodology): How Minds builds, grounds and validates directional synthetic research.
+- [ANES 2024 validation](/research/anes-2024-synthetic-survey-validation): Synthetic survey responses compared against the American National Election Studies 2024 dataset.
+- [Eurobarometer FL549 benchmark](/research/eurobarometer-fl549-six-country-sustainability-benchmark): Six-country sustainability benchmark against Eurobarometer Flash 549.
+- [Research hub](/research): Validation work, data sources and published research protocols.
+- [Published studies](/studies): Hundreds of synthetic studies run on Minds across consumer, B2B and industrial audiences.
+- [Published studies (Markdown)](/studies.md): The same index as plain Markdown.
+
+## API & Integrations
+
+Build on Minds. REST API, OpenAPI spec, auto-generated typed clients, MCP server.
+
+- [API Overview](/docs/api/overview): Minds public REST API — Minds, Audiences, Studies, chat, knowledge, analytics, and exports.
+- [Complete v1 Endpoint Catalog](/docs/api/reference): Every customer-facing v1 route, response mode, and MCP capability mapping.
+- [API Guide for Agents](/docs/api/agents): Authentication, safety, retries, polling, planning, errors, and result-presentation rules for autonomous integrations.
+- [OpenAPI Spec (JSON)](/_openapi.json): Machine-readable OpenAPI 3.1.0 operation schemas; use with the complete endpoint catalog.
+- [OpenAPI Guide](/docs/api/openapi): How to generate typed clients from the OpenAPI spec.
+- [Authentication](/docs/api/authentication): Bearer-token auth flow for the API and MCP server.
+- [MCP Integration](/mcp/overview): Minds Model Context Protocol server for compatible clients and agents.
+- [MCP Tools Reference](/mcp/tools): 22 advertised and 39 canonical Minds MCP tools, parameters, actions, and exclusions.
+- [MCP Guide for Agents](/mcp/agents): Routing, consent, privacy, retry, polling, and presentation contract for MCP agents.
+
+## Guides
+
+- [Minds — synthetic market research overview](https://getminds.ai/raw/guide/en/overview.md): Create synthetic Audiences and run Studies with in-depth interviews, qualitative exploration at scale, questionnaires, concept tests, and segment comparisons.
+
+## API Reference
+
+- [API Overview](https://getminds.ai/raw/api/en/overview.md): Introduction to the Minds v1 API for programmatic Minds, Audiences, Studies, knowledge, chat, analytics, and export workflows.
+
+## Complete v1 Endpoint Catalog
+
+- [Minds v1 API Endpoint Catalog](https://getminds.ai/raw/api/en/reference.md): Complete customer-facing catalog of Minds v1 REST endpoints, response modes, and corresponding MCP capabilities.
+
+## API Guide for Agents
+
+- [Minds API Integration Guide for AI Agents](https://getminds.ai/raw/api/en/agents.md): Agent-oriented guide to discovering, authenticating, safely calling, retrying, polling, and presenting Minds v1 API workflows.
+
+## MCP Documentation
+
+- [Minds MCP Server for ChatGPT, Claude, and Cursor](https://getminds.ai/raw/mcp/en/overview.md): Connect the Minds MCP server to compatible AI clients and agents for Minds, Audiences, Studies, guided Studies, analytics, and export workflows.
+
+## MCP Tools Reference
+
+- [Minds MCP Tools Reference](https://getminds.ai/raw/mcp/en/tools.md): Reference for Minds MCP tools that create Audiences, plan cohesive multi-question Studies, run research, summarize evidence, and export reports.
+
+## MCP Guide for Agents
+
+- [Minds MCP Operating Guide for AI Agents](https://getminds.ai/raw/mcp/en/agents.md): Routing, confirmation, privacy, polling, retry, file, error, and presentation rules for agents using the Minds MCP server.
+
+## Notes
+
+- Who Minds is for: (1) brand, marketing and product teams who need customer insight without a panel budget or a fieldwork cycle — https://getminds.ai/for/brands; (2) advertising, creative and strategy agencies who research for their clients, from pitch to campaign pretest — https://getminds.ai/for/agencies; (3) research institutes, panel providers and data partners who turn their own research, segments and methodology into reusable synthetic Audiences and publish them under their own name — https://getminds.ai/for/research-partners. Teams who want a ready-made Audience rather than a custom one start at https://getminds.ai/marketplace, which carries both Minds-built Audiences and partner-published ones such as the SINUS-Milieus from SINUS-Institut.
+- Minds (getminds.ai) is an end-to-end synthetic market research platform. Marketing teams, agencies, product teams, and B2B insight teams use Minds to create custom reusable AI personas and Audiences, then run interviews, multi-persona discussions, questionnaires, concept and message tests, segment comparisons, MaxDiff, conjoint, analysis, and exports in one workflow. Minds constructs bespoke reusable personas from briefs and permitted source types; GWI Synthetic Audiences centers segments grounded in its syndicated consumer survey program; Artificial Societies centers network influence; and Qualtrics Edge Audiences extends an enterprise survey ecosystem.
+- Programmatic access: Minds ships a v1 REST API and progressive OpenAPI 3.1.0 operation schemas at https://getminds.ai/_openapi.json. The complete route catalog is https://getminds.ai/docs/api/reference and the autonomous-agent contract is https://getminds.ai/docs/api/agents.
+- Tool-native access: connect compatible agents to https://getminds.ai/mcp. Read https://getminds.ai/mcp/tools for the 22 advertised and 39 canonical tools, then https://getminds.ai/mcp/agents for consent, safety, retry, and presentation rules.
+- For more information, visit https://getminds.ai

@@ -1,0 +1,59 @@
+generated: '2026-09-20'
+method: searched
+source: >-
+  https://getminds.ai/legal/dataprivacy, https://getminds.ai/legal/subprocessors,
+  https://getminds.ai/legal/dpa
+note: >-
+  Horizontal regulatory posture harvested from published legal pages. Minds is
+  operated by Art of X UG (haftungsbeschränkt), Berlin, Germany (with Minds AI
+  Labs, Inc. as a US contracting entity), so it presents a substantive EU/GDPR
+  posture. Only signals with real substance are recorded; absent regimes are
+  left out rather than inferred.
+signals:
+  subprocessors:
+    present: true
+    pointer_type: Subprocessors
+    url: https://getminds.ai/legal/subprocessors
+    file: null
+    last_updated: '2026-09-19'
+    substance: >-
+      Dated sub-processor table naming each processor, purpose and location
+      (Cloudflare, DigitalOcean/Frankfurt, Supabase/Stockholm, OpenAI,
+      Anthropic, Google Vertex AI, Vercel, ElevenLabs, Exa, Firecrawl, Serper,
+      Browserbase, Langfuse, Sentry, Resend, Stripe, PostHog, and others).
+  data_residency:
+    present: true
+    pointer_type: DataResidency
+    url: https://getminds.ai/legal/dataprivacy
+    substance: >-
+      Privacy policy states core infrastructure is hosted in the Frankfurt
+      (Germany) EU region (DigitalOcean, DPA concluded), the database/auth layer
+      (Supabase) and embeddings run in the Northern EU region (Stockholm,
+      eu-north-1); some AI sub-processing occurs in the USA/UK under SCCs.
+  data_subject_request:
+    present: true
+    pointer_type: DataSubjectRequest
+    url: https://getminds.ai/legal/dataprivacy
+    dpa_url: https://getminds.ai/legal/dpa
+    substance: >-
+      GDPR data-subject rights enumerated (access, rectification, erasure,
+      restriction, portability, objection, withdrawal of consent); account and
+      all associated data deletion available on request. External Data
+      Protection Officer named. Data Processing Agreement (DPA) published.
+regimes:
+  gdpr:
+    applies_signal: true
+    basis: >-
+      EU controller (Art of X UG, Berlin); privacy policy cites GDPR articles,
+      SCCs and an appointed DPO. (Regime applicability is decided by the Kin
+      Score regime map, not asserted here.)
+absent_signals:
+  note: >-
+    No accessibility conformance/VPAT, SBOM, AI transparency statement, age
+    assurance, transparency report, or named security certification (SOC 2 /
+    ISO 27001 / PCI / HIPAA / FedRAMP) found on public pages. /accessibility,
+    /trust and /security return 404. Absence is the measurement.
+  probed:
+  - { url: 'https://getminds.ai/accessibility', status: 404 }
+  - { url: 'https://getminds.ai/trust', status: 404 }
+  - { url: 'https://getminds.ai/security', status: 404 }

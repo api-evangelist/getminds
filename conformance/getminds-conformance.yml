@@ -1,0 +1,74 @@
+generated: '2026-09-20'
+method: searched
+source: >-
+  well-known/getminds-oauth-authorization-server.json,
+  well-known/getminds-oauth-protected-resource.json,
+  well-known/getminds-openid-configuration.json,
+  well-known/getminds-api-catalog.json, openapi/getminds-openapi.json
+standards:
+- id: oauth2
+  name: OAuth 2.0 (RFC 6749)
+  conforms: true
+  evidence: >-
+    Authorization Code grant with refresh_token advertised in
+    /.well-known/oauth-authorization-server for the MCP protected resource.
+- id: oauth2-pkce
+  name: PKCE (RFC 7636)
+  conforms: true
+  evidence: code_challenge_methods_supported ["S256"] in authorization-server metadata.
+- id: oauth2-authz-server-metadata
+  name: OAuth 2.0 Authorization Server Metadata (RFC 8414)
+  conforms: true
+  evidence: https://getminds.ai/.well-known/oauth-authorization-server (200 JSON).
+- id: oauth2-protected-resource-metadata
+  name: OAuth 2.0 Protected Resource Metadata (RFC 9728)
+  conforms: true
+  evidence: >-
+    https://getminds.ai/.well-known/oauth-protected-resource and per-resource
+    /.well-known/oauth-protected-resource/mcp (200 JSON), resource=/mcp.
+- id: oauth2-dynamic-client-registration
+  name: OAuth 2.0 Dynamic Client Registration (RFC 7591)
+  conforms: true
+  evidence: registration_endpoint https://getminds.ai/oauth/register advertised.
+- id: oidc
+  name: OpenID Connect Discovery
+  conforms: true
+  evidence: >-
+    https://getminds.ai/.well-known/openid-configuration (200 JSON) with issuer,
+    jwks_uri, id_token claims (sub/iss/aud/exp/iat/email/email_verified).
+- id: well-known
+  name: Well-Known URIs (RFC 8615)
+  conforms: true
+  evidence: Multiple served /.well-known/* documents (openid, oauth, api-catalog).
+- id: api-catalog
+  name: The API-Catalog Well-Known URI (RFC 9727)
+  conforms: true
+  evidence: >-
+    https://getminds.ai/.well-known/api-catalog (200) returns an RFC 9727
+    linkset with service-doc, status and related (MCP) links.
+- id: mcp
+  name: Model Context Protocol
+  conforms: true
+  evidence: >-
+    streamable-http MCP server at https://getminds.ai/mcp with a published MCP
+    server card at /.well-known/mcp/server-card.json (serverInfo, tools).
+- id: openapi-3.1
+  name: OpenAPI 3.1.0
+  conforms: true
+  evidence: https://getminds.ai/_openapi.json parses as OpenAPI 3.1.0 (103 operations).
+- id: pagination
+  name: Cursor/offset pagination
+  conforms: true
+  evidence: limit/offset and cursor/after params across list operations.
+- id: rfc9457
+  name: Problem Details for HTTP APIs (RFC 9457)
+  conforms: false
+  evidence: >-
+    Errors use a custom flat envelope (statusCode/statusMessage/message/url/
+    error/data), not application/problem+json.
+domain_standard:
+  present: false
+  note: >-
+    Commercial synthetic market research has no formal machine-readable domain
+    contract standard (no SCIM/OData/FHIR/OpenRTB/etc. applies). Reward-only
+    slot left empty rather than inventing a conformance.
