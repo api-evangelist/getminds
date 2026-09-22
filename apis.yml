@@ -16,7 +16,7 @@ tags:
 - Surveys
 - User Research
 - Marketing Analytics
-- AI Personas
+- ai-personas
 - MCP
 - agent-native
 - GDPR
@@ -30,6 +30,7 @@ tags_raw:
 - mcp
 - agent-native
 - gdpr
+- AI Personas
 image: https://getminds.ai/images/preview.webp
 url: https://raw.githubusercontent.com/api-evangelist/getminds/refs/heads/main/apis.yml
 created: '2026-09-20'
@@ -46,13 +47,14 @@ apis:
   tags:
   - Synthetic Research
   - Market Research
-  - AI Personas
+  - ai-personas
   - agent-native
   tags_raw:
   - synthetic-research
   - market-research
   - ai-personas
   - agent-native
+  - AI Personas
   properties:
   - type: OpenAPI
     url: openapi/getminds-openapi.json
