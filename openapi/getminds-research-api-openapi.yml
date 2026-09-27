@@ -1,0 +1,557 @@
+openapi: 3.2.0
+info:
+  title: Minds Public Research API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: Research
+paths:
+  /api/v1/research-methods:
+    get:
+      parameters: []
+      responses:
+        '200':
+          description: Versioned research methods.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          description: Missing or invalid authentication.
+      operationId: listResearchMethods
+      summary: List research methods
+      description: Return the versioned research-method catalog, explicit executable state, availability, configuration JSON Schemas, semantic output types, and fallback methods. Experimental and planned methods are visible for framework compatibility but cannot be executed.
+      tags:
+      - Research
+      security:
+      - ApiKeyAuth: []
+  /api/v1/studies/{studyId}/research-plans/preview:
+    post:
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Saved plan draft, per-question response contracts, and confirmation questions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    properties: {}
+        '400':
+          description: Invalid request.
+        '401':
+          description: Unauthorized.
+        '403':
+          description: Study access denied.
+        '404':
+          description: Study or draft not found.
+        '409':
+          description: Draft revision conflict.
+      operationId: previewStudyResearchPlan
+      summary: Preview or revise a study research plan
+      description: 'Let the research-planning model capture intent, main source, all attached assets, questions, optional methods, semantic outputs, missing inputs, confirmation questions, and a proposed response contract for every question. Clients can deterministically edit response formats and assign durable assets to exact questions. Pass `questions` instead of `request` to transcribe a fixed instrument exactly: text, order, ids, and per-item response contracts are stored as given and no planning model runs. Fetchable remote files are copied into durable Minds chat storage before the versioned draft is saved. Local file:// paths are not uploads. This endpoint never executes research.'
+      tags:
+      - Research
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                loadLatest:
+                  type: boolean
+                  description: Read the latest owned draft without planning or saving. Requires draftPlanId; cannot be combined with edits or planner inputs.
+                edits:
+                  type: object
+                  description: Deterministic edits to a saved revision. Preserves methods and source policy; cannot be combined with planner inputs.
+                  additionalProperties: false
+                  properties:
+                    objective:
+                      type: string
+                      maxLength: 2000
+                    promptContent:
+                      type: string
+                      maxLength: 20000
+                    questions:
+                      type: array
+                      minItems: 1
+                      maxItems: 200
+                      items:
+                        type: object
+                        additionalProperties: false
+                        required:
+                        - id
+                        - moduleId
+                        - text
+                        - response
+                        properties:
+                          id:
+                            type: string
+                          moduleId:
+                            type: string
+                          text:
+                            type: string
+                            maxLength: 2000
+                          attachmentIds:
+                            type: array
+                            items:
+                              type: string
+                request:
+                  type: string
+                studyLocale:
+                  type: string
+                  enum:
+                  - en
+                  - es
+                  - fr
+                  - de
+                  - zh
+                  - tr
+                  - ar
+                  - ja
+                  - ko
+                  description: Language used for the plan and its eventual study output.
+                sourcePolicy:
+                  type: string
+                  enum:
+                  - request_only
+                  - auto
+                  default: request_only
+                  description: Evidence policy stored in this exact draft revision. request_only keeps a controlled Study closed to retrieved Mind documents and live web. auto is an explicit experimental opt-in to relevant Mind-knowledge retrieval; response-mode rules still control live web search.
+                mindSourcePolicyOverrides:
+                  type: array
+                  maxItems: 2000
+                  description: Experimental checksum-locked Mind assignments. Each Mind UUID may appear once. Unlisted Minds use sourcePolicy; persisted knowledge_only locks remain stricter.
+                  items:
+                    type: object
+                    required:
+                    - mindId
+                    - sourcePolicy
+                    additionalProperties: false
+                    properties:
+                      mindId:
+                        type: string
+                        format: uuid
+                      sourcePolicy:
+                        type: string
+                        enum:
+                        - request_only
+                        - auto
+                source:
+                  type: object
+                  description: The main source. Prompt content is exact respondent-visible material and is separate from planner-only request text.
+                  properties:
+                    kind:
+                      type: string
+                      enum:
+                      - prompt
+                      - website
+                      - image
+                      - video
+                      - document
+                      - questionnaire
+                      - other
+                    label:
+                      type: string
+                    url:
+                      type: string
+                      format: uri
+                    mimeType:
+                      type: string
+                    content:
+                      type: string
+                attachments:
+                  type: array
+                  description: Files and website assets available to the confirmed run (one question block). Multi-asset blocks require complete question assignments and coverage of every asset; each question receives only its own assets. Empty lists explicitly mean no assets. Remote file URLs are durably imported; kind website remains a website.
+                  items:
+                    type: object
+                    properties:
+                      kind:
+                        type: string
+                        enum:
+                        - website
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      url:
+                        type: string
+                      path:
+                        type: string
+                      mimeType:
+                        type: string
+                      type:
+                        type: string
+                questionAttachments:
+                  type: array
+                  description: One-based question-to-attachment-id mapping. Multi-asset blocks require every question to be mapped and every asset to be used. Empty attachmentIds means no assets. Each question may appear at most once.
+                  items:
+                    type: object
+                    required:
+                    - questionNumber
+                    - attachmentIds
+                    additionalProperties: false
+                    properties:
+                      questionNumber:
+                        type: integer
+                        minimum: 1
+                      attachmentIds:
+                        type: array
+                        minItems: 0
+                        uniqueItems: true
+                        items:
+                          type: string
+                suggestQuestionStimuli:
+                  type: boolean
+                  description: Default true. Lets the planner assign each attached file or website to one or more questions; the ids appear as attachmentIds on those questions. Pass false to keep questions unassigned unless questionAttachments names them.
+                draftPlanId:
+                  type: string
+                  format: uuid
+                revision:
+                  type: integer
+                  minimum: 1
+                refinement:
+                  type: string
+                answers:
+                  type: object
+                  additionalProperties:
+                    type: string
+                questionResponses:
+                  type: object
+                  description: Explicit response-format edits keyed by question ID from the current draft.
+                idempotencyKey:
+                  type: string
+                  maxLength: 200
+                  description: 'Retry-safety key. A repeated preview with the same key returns the draft revision the first attempt saved (`replayed: true`) instead of planning again. The `Idempotency-Key` header takes precedence.'
+  /api/v1/studies/{studyId}/research-runs/{runId}:
+    get:
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Durable study status and immutable response contracts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                        - queued
+                        - running
+                        - completed
+                        - partial
+                        - failed
+                        - cancelled
+                        - plan_limited
+                        description: Partial means settled questions have missing respondent answers or some questions failed. It is terminal collection, not complete evidence.
+                      progress:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          settled:
+                            type: integer
+                          failed:
+                            type: integer
+                          partial:
+                            type: integer
+                            description: Questions with recorded incomplete respondent coverage.
+                          skipped:
+                            type: integer
+                          pct:
+                            type: integer
+                            description: Settled-question progress, not respondent coverage.
+                      respondentStimulusDelivery:
+                        type: object
+                        description: Configured stimulus channel, not proof of delivery. The frozen base Mind profile excludes per-run stimulus.
+                        properties:
+                          channel:
+                            type: string
+                            enum:
+                            - prompt_evidence
+                            - website_analysis
+                            - file_analysis
+                            - none
+                          mindProfileIncludesStimulus:
+                            type: boolean
+                            enum: []
+                          verification:
+                            type: string
+                            enum:
+                            - configuration_only
+                          description:
+                            type: string
+                      respondentMediaEvidence:
+                        type: object
+                        description: Per-Mind video evidence audit. Verified means every recorded answer for every video question has matching audiovisual receipts and accepted-call SDK media prompt hashes.
+                        properties:
+                          version:
+                            type: string
+                            enum:
+                            - respondent-media-evidence-v1
+                          status:
+                            type: string
+                            enum:
+                            - not_applicable
+                            - verified
+                            - incomplete
+                          videoQuestionCount:
+                            type: integer
+                          answerCount:
+                            type: integer
+                          verifiedAnswerCount:
+                            type: integer
+                          visualContract:
+                            type: string
+                            enum:
+                            - scene-sampled-frames
+                          speechContract:
+                            type: string
+                            enum:
+                            - full-transcript
+                          soundtrackContract:
+                            type: string
+                            enum:
+                            - bounded-analysis
+                          failures:
+                            type: array
+                            items:
+                              type: object
+                              additionalProperties: true
+                      questionAttachments:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+                      calculations:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+        '401':
+          description: Unauthorized.
+        '403':
+          description: Study access denied.
+        '404':
+          description: Study not found.
+      operationId: getStudyResearchStudy
+      summary: Get research study status
+      description: Return durable progress, the immutable confirmed plan snapshot with per-question response contracts, response artifacts, deterministic method calculations, and stage readiness for a confirmed multi-question Study run.
+      tags:
+      - Research
+      security:
+      - ApiKeyAuth: []
+  /api/v1/studies/{studyId}/research-runs:
+    post:
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Study queued with its immutable confirmed response contracts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    properties: {}
+        '400':
+          description: Plan is incomplete, unconfirmed, invalid, unavailable, or not executable.
+        '401':
+          description: Unauthorized.
+        '403':
+          description: Study or draft access denied.
+        '404':
+          description: Study or draft not found.
+        '409':
+          description: Draft already confirmed for another run, or a Mind in an attached Audience has not finished training (legacy code `PANEL_MINDS_NOT_READY`, with `data.notReady` naming them). Retry once training completes.
+        '422':
+          description: Required respondent-visible image, file, or URL could not be read. The Study is not queued and no quota is used.
+      operationId: runStudyQuestions
+      summary: Confirm and run a multi-question Study block
+      description: Execute an exact saved research-plan revision after explicit confirmation, including every confirmed per-question response and attachment contract. The server, not the client or model, marks required capabilities reviewed and enforces advanced-method opt-in, method availability, and durable media resolution.
+      tags:
+      - Research
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - draftPlanId
+              - revision
+              - confirmation
+              properties:
+                draftPlanId:
+                  type: string
+                  format: uuid
+                revision:
+                  type: integer
+                  minimum: 1
+                confirmation:
+                  type: object
+                  required:
+                  - accepted
+                  properties:
+                    accepted:
+                      type: boolean
+                      enum:
+                      - true
+                    advancedMethodOptIn:
+                      type: boolean
+                audienceIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                idempotencyKey:
+                  type: string
+                  format: uuid
+                modelConnection:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - id
+                  - revision
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    revision:
+                      type: integer
+                      minimum: 1
+                  description: Verified caller-team connection for Mind answers and verbatim rendering. Pinned at confirmation; retries must keep the same selection. Supporting analysis retains platform models.
+  /api/v1/studies/{studyId}/summary:
+    get:
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Persisted semantic summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+        '400':
+          description: Study is not in study mode.
+        '401':
+          description: Unauthorized.
+        '403':
+          description: Study access denied.
+        '404':
+          description: Study not found.
+      operationId: getStudySemanticSummary
+      summary: Get a study semantic summary
+      description: Return the persisted whole-study summary, semantic output blocks, staleness, and message coverage. Renderers are hints; consumers may introduce new UI logic without changing evidence contracts.
+      tags:
+      - Research
+      security:
+      - ApiKeyAuth: []
+    post:
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Generated semantic summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+        '400':
+          description: Study is not in study mode, or does not have enough content.
+        '401':
+          description: Unauthorized.
+        '403':
+          description: Study access denied.
+        '404':
+          description: Study not found.
+      operationId: refreshStudySemanticSummary
+      summary: Generate or refresh a study semantic summary
+      description: Generate and persist a whole-study summary with flexible semantic blocks. Visual-source evidence is represented as heatmaps rather than generic distribution charts.
+      tags:
+      - Research
+      security:
+      - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'

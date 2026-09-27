@@ -1,0 +1,46 @@
+{
+  "provider": "getminds",
+  "sources": [
+    "getminds-openapi.json"
+  ],
+  "outputs": [
+    "getminds-api-keys-api-openapi.yml",
+    "getminds-agent-runs-api-openapi.yml",
+    "getminds-audiences-api-openapi.yml",
+    "getminds-auth-api-openapi.yml",
+    "getminds-chat-api-openapi.yml",
+    "getminds-knowledge-api-openapi.yml",
+    "getminds-meta-api-openapi.yml",
+    "getminds-minds-api-openapi.yml",
+    "getminds-models-api-openapi.yml",
+    "getminds-research-api-openapi.yml",
+    "getminds-studies-api-openapi.yml",
+    "getminds-study-drafts-api-openapi.yml",
+    "getminds-study-runs-api-openapi.yml",
+    "getminds-study-templates-api-openapi.yml"
+  ],
+  "archived": [
+    "archived openapi/getminds-openapi.json"
+  ],
+  "errors": [],
+  "warnings": [],
+  "notes": [
+    "getminds-openapi.json: upgraded openapi 3.1.0 -> OpenAPI 3.2.0",
+    "getminds-openapi.json: declared missing tag: API Keys",
+    "getminds-openapi.json: declared missing tag: Agent Runs",
+    "getminds-openapi.json: declared missing tag: Audiences",
+    "getminds-openapi.json: declared missing tag: Auth",
+    "getminds-openapi.json: declared missing tag: Chat",
+    "getminds-openapi.json: declared missing tag: Knowledge",
+    "getminds-openapi.json: declared missing tag: Meta",
+    "getminds-openapi.json: declared missing tag: Minds",
+    "getminds-openapi.json: declared missing tag: Models",
+    "getminds-openapi.json: declared missing tag: Research",
+    "getminds-openapi.json: declared missing tag: Studies",
+    "getminds-openapi.json: declared missing tag: Study Drafts",
+    "getminds-openapi.json: declared missing tag: Study Runs",
+    "getminds-openapi.json: declared missing tag: Study Templates",
+    "apis.yml register: written (+14 apis, 15 total)"
+  ],
+  "skipped": []
+}

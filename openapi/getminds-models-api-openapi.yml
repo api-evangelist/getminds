@@ -1,0 +1,48 @@
+openapi: 3.2.0
+info:
+  title: Minds Public Models API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: Models
+paths:
+  /api/v1/model-connections:
+    get:
+      parameters:
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Connection metadata, capability flags, and pagination.nextCursor. No credentials or raw probe results.
+        '400':
+          description: Invalid cursor.
+        '401':
+          description: Unauthorized.
+        '403':
+          description: Eligible team membership required.
+        '404':
+          description: Model connections disabled.
+      operationId: listModelConnections
+      summary: List the caller team’s model connections and verified capabilities
+      tags:
+      - Models
+      security:
+      - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'

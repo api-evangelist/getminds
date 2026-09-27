@@ -1,0 +1,175 @@
+openapi: 3.2.0
+info:
+  title: Minds Public API Keys API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: API Keys
+paths:
+  /api/v1/api-keys/{keyId}:
+    delete:
+      parameters:
+      - in: path
+        name: keyId
+        required: true
+        description: 'API key ID from `GET /v1/api-keys` (cuid: `c` followed by 24 lowercase alphanumerics).'
+        schema:
+          type: string
+          pattern: ^c[a-z0-9]{24}$
+      responses:
+        '204':
+          description: API key deleted. Empty body.
+        '400':
+          description: '`API key ID is required` or `Invalid API key ID format` (not a well-formed cuid).'
+        '401':
+          description: Missing or invalid API key (`Unauthorized`).
+        '403':
+          description: 'No active subscription (`Forbidden`): API key access requires an active subscription. Please upgrade to the Premium or Team plan.'
+        '404':
+          description: '`API key not found`: no key with this ID belongs to the authenticated account.'
+      operationId: deleteApiKey
+      summary: Revoke an API key
+      description: 'Permanently delete one API key owned by the authenticated account. The key stops authenticating immediately (the resolver cache is invalidated on delete). Use this to rotate credentials: create a replacement with `POST /v1/api-keys`, switch your integration over, then revoke the old key. Deleting the key used for the current request is allowed. Requires an active Premium or Team subscription.'
+      tags:
+      - API Keys
+      security:
+      - ApiKeyAuth: []
+  /api/v1/api-keys:
+    get:
+      parameters: []
+      responses:
+        '200':
+          description: API keys ordered by `createdAt` descending.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiKeySummary'
+              example:
+              - id: clx1a2b3c4d5e6f7g8h9i0j1k
+                name: prod
+                createdAt: '2025-12-10T12:00:00.000Z'
+                lastUsedAt: '2025-12-10T13:00:00.000Z'
+        '401':
+          description: Missing or invalid API key (`Unauthorized`).
+        '403':
+          description: 'No active subscription (`Forbidden`): API key access requires an active subscription. Please upgrade to the Premium or Team plan.'
+      operationId: listApiKeys
+      summary: List API keys
+      description: List metadata for every API key on the authenticated account, newest first. Secret key values are never returned; the raw key is shown exactly once, in the response of `POST /v1/api-keys`. Requires an active Premium or Team subscription.
+      tags:
+      - API Keys
+      security:
+      - ApiKeyAuth: []
+    post:
+      parameters: []
+      responses:
+        '201':
+          description: API key created. `key` is the raw secret and is only ever returned in this response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyCreated'
+              example:
+                id: clx1a2b3c4d5e6f7g8h9i0j1k
+                name: prod
+                createdAt: '2025-12-10T12:00:00.000Z'
+                key: minds_0000111122223333444455556666777788889999aaaabbbb
+        '400':
+          description: '`name must be a string` (non-string, non-null `name`) or `name must be 100 characters or fewer` (after trimming).'
+        '401':
+          description: Missing or invalid API key (`Unauthorized`).
+        '403':
+          description: 'No active subscription (`Forbidden`: API key access requires an active subscription. Please upgrade to the Premium or Team plan.) or `API keys are disabled for this SSO-linked account`.'
+      operationId: createApiKey
+      summary: Create an API key
+      description: 'Mint a new API key for the authenticated account and return its secret value exactly once. Store the `key` immediately; it cannot be retrieved again (`GET /v1/api-keys` returns metadata only). The body is optional: send `{ "name": "prod" }` to label the key, or no body at all for an unnamed key. Requires an active Premium or Team subscription. Accounts whose credentials are managed by an SSO identity link cannot mint API keys.'
+      tags:
+      - API Keys
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 100
+                  description: 'Optional label shown in the key list and Settings UI. Whitespace is trimmed; an empty, null, or missing value stores the key unnamed (`name: null`).'
+            examples:
+              named:
+                summary: Labelled key
+                value:
+                  name: prod
+              unnamed:
+                summary: Unnamed key (empty body is also accepted)
+                value: {}
+components:
+  schemas:
+    ApiKeyCreated:
+      type: object
+      required:
+      - id
+      - name
+      - createdAt
+      - key
+      properties:
+        id:
+          type: string
+          description: API key ID (cuid). Use it with `DELETE /v1/api-keys/{keyId}`.
+        name:
+          type:
+          - string
+          - 'null'
+          description: Label as stored (trimmed), or null.
+        createdAt:
+          type: string
+          format: date-time
+        key:
+          type: string
+          pattern: ^minds_[0-9a-f]{48}$
+          description: 'Raw secret, `minds_` followed by 48 hex characters. Send it as `Authorization: Bearer <key>`. Shown only once.'
+    ApiKeySummary:
+      type: object
+      required:
+      - id
+      - name
+      - createdAt
+      - lastUsedAt
+      properties:
+        id:
+          type: string
+          description: 'API key ID (cuid: `c` followed by 24 lowercase alphanumerics). Use it with `DELETE /v1/api-keys/{keyId}`.'
+        name:
+          type:
+          - string
+          - 'null'
+          description: Human-readable label, or null for an unnamed key.
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Last time the key authenticated a request; null if never used.
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'

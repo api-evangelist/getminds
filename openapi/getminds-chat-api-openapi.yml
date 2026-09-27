@@ -1,0 +1,1745 @@
+openapi: 3.2.0
+info:
+  title: Minds Public Chat API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: Chat
+paths:
+  /api/v1/chats/{chatId}:
+    delete:
+      parameters:
+      - in: path
+        name: chatId
+        required: true
+        description: Chat UUID (the `data.id` returned by `POST /v1/chats`).
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Chat deleted. No body.
+        '400':
+          description: '`Chat ID is required` or `Invalid chat ID format` (not a UUID).'
+        '401':
+          description: Missing or invalid API key (`Unauthorized`).
+        '403':
+          description: The chat exists but the caller is not its owner (`Forbidden`).
+        '404':
+          description: No chat with this ID (`Chat not found`).
+        '500':
+          description: Internal server error.
+      operationId: deleteChat
+      summary: Delete a chat
+      description: Permanently delete a stateful chat created with `POST /v1/chats` together with its messages, Mind assignments and Study Audience memberships. Only the chat owner may delete it; the Minds and Audiences themselves are untouched. Use this to clean up finished conversations. Returns 204 with an empty body.
+      tags:
+      - Chat
+      security:
+      - ApiKeyAuth: []
+  /api/v1/chats/{chatId}/messages:
+    post:
+      parameters:
+      - in: path
+        name: chatId
+        required: true
+        description: Chat UUID returned by `POST /v1/chats`.
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: 'Reply generated (or system note stored). Discriminate on the presence of `messages` (multi-Mind), `outputData` (Study), `role: "system"` (system note) or `content` (single Mind).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessageResponse'
+              examples:
+                singleMind:
+                  summary: Single-Mind reply
+                  value:
+                    content: Recent advancements include perovskite cells with 30%+ efficiency…
+                    messageId: cmnkbsddh00033v01ptk9t4et
+                structured:
+                  summary: Single-Mind reply with structured output
+                  value:
+                    content: '{"score":8,"reason":"Concrete benefit, memorable rhythm."}'
+                    messageId: cmnkbsddh00033v01ptk9t4et
+                    parsed:
+                      score: 8
+                      reason: Concrete benefit, memorable rhythm.
+                toolCall:
+                  summary: Single-Mind reply requesting a tool call
+                  value:
+                    content: ''
+                    messageId: cmnkbsddh00033v01ptk9t4et
+                    tool_calls:
+                    - id: call_abc123
+                      name: create_meeting
+                      arguments:
+                        startsAt: '2026-09-08T10:00:00+02:00'
+                        durationMinutes: 30
+                multiMind:
+                  summary: Multi-Mind replies
+                  value:
+                    messages:
+                    - content: From a growth angle…
+                      messageId: cmnkbsddh00033v01ptk9t4et
+                      mind:
+                        id: 4774888e-0a03-40d7-979b-39b47c4c049c
+                        name: Ada
+                    - content: I disagree on timing…
+                      messageId: cmnkbsddh00043v01abcd1234
+                      mind:
+                        id: 9bf44ab0-9d83-42ec-b941-c0ab7610e949
+                        name: Grace
+                study:
+                  summary: Study chat aggregated output
+                  value:
+                    outputData:
+                      title: How likely are you to recommend this product?
+                      type: scale
+                      audiences:
+                      - audience: Gen Z shoppers
+                        value: '7.4'
+                        answers:
+                        - value: '8'
+                          persona: Mia
+                          message: Pretty likely — the onboarding was quick.
+                system:
+                  summary: System note stored
+                  value:
+                    messageId: cmnkbsddh00053v01sys00001
+                    role: system
+        '400':
+          description: 'Validation error: `Message content is required`, `Invalid chat ID format`, `role must be "user" or "system"`, `Both model and provider required for override`, `Invalid provider: ''{provider}''. Allowed: anthropic, openai, google.`, `Invalid model ''{model}'' for provider ''{provider}''.`, invalid `response_format` / `tools` / `tool_choice` (e.g. `tools[0].name ''WEB_SEARCH'' conflicts with an internal tool name`, `Maximum 128 tools allowed`), `Study must have at least one assigned Mind`, or for Study chats `Study has no audiences assigned` / `Study audiences have no Mind members`.'
+        '401':
+          description: Missing or invalid API key.
+        '402':
+          description: 'Study chats only: an attached Audience is a paid marketplace add-on you have not subscribed to (`data.code: MARKETPLACE_ADDON_REQUIRED`).'
+        '403':
+          description: 'Plan limit reached (`data.code: PLAN_LIMIT`). One of: the per-chat user-message cap (`limitType: messages`, `{Plan} plan limit reached`); the started-Study cap when this is the first user message in the chat (`limitType: flows`); the monthly synthetic-response allowance, reserved before generation and charged per replying Mind (`limitType: responses`, includes `periodEnd`); or for Study chats an Audience above the per-Audience member cap (`limitType: audienceMembers`).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatPlanLimitError'
+        '404':
+          description: No chat with this ID owned by the caller (`Study not found or access denied`), or `User profile not found`.
+        '409':
+          description: 'Study chats only: no Mind in the attached Audiences is ready to chat (`data.code: PANEL_MINDS_NOT_READY`). Status message is `{n} Mind(s) in this study is/are still training` or `… failed training and must be retrained before a study can run`. Partially trained Studies proceed with the ready subset instead of failing.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatStudyMindsNotReadyError'
+        '500':
+          description: Generation failed, or for multi-Mind chats `No Minds responded`.
+        '503':
+          description: 'Usage metering is temporarily unavailable (`data.code: USAGE_METERING_UNAVAILABLE`); nothing was generated or charged, retry later.'
+      operationId: sendChatMessage
+      summary: Send a message to a chat
+      description: 'Append a turn to a stateful chat and receive the reply. The server persists every message, sends the last 8 turns verbatim and compresses older ones into a rolling summary, so you only ever send the new message. The response shape depends on how the chat was created: a single-Mind chat returns `content` + `messageId` (plus `parsed` / `tool_calls` when structured output or tools were requested); a multi-Mind chat returns `messages[]` with one entry per Mind the moderator let speak (each Mind at most once per turn, up to 5 turns); a Study chat fans the message out to every ready Mind in the attached Audiences and returns aggregated `outputData`. Send `role: "system"` to store a note in the transcript without triggering any reply. Only the chat owner can post. This endpoint always responds with buffered JSON; for progress streaming use `POST /v1/minds/{mindId}/completion` with `responseMode: "stream"`.'
+      tags:
+      - Chat
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatMessageRequest'
+            examples:
+              basic:
+                summary: Plain user message
+                value:
+                  content: What are the top marketing trends this year?
+              withEndUser:
+                summary: Name the end user and pin the model
+                value:
+                  content: Which of those fits a small budget?
+                  endUserName: Lena
+                  model: claude-sonnet-5
+                  provider: anthropic
+              structured:
+                summary: Structured output (single-Mind chat only)
+                value:
+                  content: 'Rate this tagline from 1 to 10 and explain: "Ship faster, sleep better."'
+                  response_format:
+                    type: json_schema
+                    json_schema:
+                      name: tagline_rating
+                      schema:
+                        type: object
+                        properties:
+                          score:
+                            type: integer
+                            minimum: 1
+                            maximum: 10
+                          reason:
+                            type: string
+                        required:
+                        - score
+                        - reason
+              tools:
+                summary: Function calling (single-Mind chat only)
+                value:
+                  content: Book a 30 minute call with me tomorrow at 10:00.
+                  tools:
+                  - name: create_meeting
+                    description: Create a calendar meeting
+                    parameters:
+                      type: object
+                      properties:
+                        startsAt:
+                          type: string
+                          format: date-time
+                        durationMinutes:
+                          type: integer
+                      required:
+                      - startsAt
+                      - durationMinutes
+                  tool_choice: auto
+              systemNote:
+                summary: Store a system note without a reply
+                value:
+                  role: system
+                  content: The user has switched to the enterprise plan.
+  /api/v1/chats:
+    post:
+      parameters: []
+      responses:
+        '200':
+          description: Existing response thread resumed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ChatCreated'
+        '201':
+          description: 'Chat created. Mind chats return `data.minds`; Study chats return `data.type: "study"` and `data.audiences`.'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    oneOf:
+                    - $ref: '#/components/schemas/ChatCreated'
+                    - $ref: '#/components/schemas/ChatStudyCreated'
+              examples:
+                singleMind:
+                  summary: Mind chat
+                  value:
+                    data:
+                      id: 601af953-3837-49c1-a31e-4fdbfa82ac04
+                      name: Research Session
+                      description: null
+                      createdAt: '2026-04-04T12:45:24.078Z'
+                      minds:
+                      - id: 4774888e-0a03-40d7-979b-39b47c4c049c
+                        name: Ada Lovelace
+                        discipline: Mathematics
+                study:
+                  summary: Study chat
+                  value:
+                    data:
+                      id: 7c1d2c0e-3b1a-4c0f-9f2e-0e6a1b2c3d4e
+                      name: Onboarding feedback
+                      type: study
+                      audiences:
+                      - id: 550e8400-e29b-41d4-a716-446655440000
+                        name: Gen Z shoppers
+                        mindCount: 25
+                      createdAt: '2026-04-04T12:45:24.078Z'
+        '400':
+          description: 'Validation error: `At least one of mindId, mindIds, or audienceIds is required`, `At least one Mind ID is required`, or a retired field name (rejected with a message naming its replacement).'
+        '401':
+          description: Missing or invalid API key.
+        '402':
+          description: 'Study chats only: an attached Audience is a paid marketplace add-on you have not subscribed to (`This Audience requires an active add-on subscription to use.`, `data.code: MARKETPLACE_ADDON_REQUIRED` with `audienceId`, `addOnId`, `priceLabel`).'
+        '403':
+          description: 'Plan limit reached (`data.code: PLAN_LIMIT`). Either the started-Study cap (`limitType: flows`, `context: chatCreation` or `studyCreation`, status message `{Plan} plan includes N Studies. Upgrade to … to create more Studies.`) or, for Study chats, an attached Audience exceeds the per-Audience member cap (`limitType: audienceMembers`).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatPlanLimitError'
+        '404':
+          description: 'A referenced Mind or Audience does not exist or is not accessible: `Minds not found: {ids}`, `No valid Minds found`, `Audiences not found: {ids}`. Also `User profile not found` when the API key owner has no profile.'
+        '500':
+          description: Internal server error.
+      operationId: createChat
+      summary: Create a stateful chat
+      description: 'Create a persistent conversation whose history, context compression and rolling summary are managed server-side, then post turns with `POST /v1/chats/{chatId}/messages`. Pick exactly one shape: `mindId` for a 1:1 chat with a single Mind, `mindIds` for a multi-Mind conversation where a moderator decides which Mind answers each turn, or `audienceIds` for a Study chat that fans every message out to all Minds in the attached Audiences and returns aggregated output. Use this when you want the server to remember the conversation; use `POST /v1/minds/{mindId}/completion` when you manage history yourself. Minds must be owned by you, public, or shared with your team; Audiences must be ones you own, belong to, or that are public or shared with your team. Retired field names are rejected with 400 naming the replacement.'
+      tags:
+      - Chat
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCreateRequest'
+            examples:
+              singleMind:
+                summary: 1:1 chat with one Mind
+                value:
+                  name: Research Session
+                  mindId: 4774888e-0a03-40d7-979b-39b47c4c049c
+              multiMind:
+                summary: Multi-Mind conversation
+                value:
+                  name: Launch debate
+                  mindIds:
+                  - 4774888e-0a03-40d7-979b-39b47c4c049c
+                  - 9bf44ab0-9d83-42ec-b941-c0ab7610e949
+              study:
+                summary: Study chat over Audiences
+                value:
+                  name: Onboarding feedback
+                  description: Gen Z shoppers
+                  audienceIds:
+                  - 550e8400-e29b-41d4-a716-446655440000
+  /api/v1/minds/{mindId}/completion:
+    post:
+      parameters:
+      - in: path
+        name: mindId
+        required: true
+        description: Mind UUID.
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: 'Reply generated. `application/json` for `responseMode: "sync"` (default); `text/event-stream` for `responseMode: "stream"`, where the `result` frame carries the identical `MindCompletionResponse` payload and any failure (including 401/403/404/409/429) is reported as an `error` frame.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MindCompletionResponse'
+              examples:
+                text:
+                  summary: Text reply with citations
+                  value:
+                    messageId: msg_550e840029b141d4a716446655440000
+                    content: Recent advancements include perovskite cells with 30%+ efficiency[[CITE:0]]…
+                    metadata:
+                      ragCitations:
+                      - id: 9bf44ab0-9d83-42ec-b941-c0ab7610e949
+                        displaySource: Mind knowledge
+                        similarity: 0.89
+                        sourceType: mind_knowledge
+                      answerProvenance:
+                        origin: cited_sources
+                        sourcePolicy: auto
+                        retrievalAttempted: true
+                        retrievalChunksFound: 4
+                        evidenceSourceTypes:
+                        - mind_knowledge
+                        fallbackStatus: grounded
+                        unsupported: false
+                        recordedAt: '2026-09-07T10:00:00.000Z'
+                        verifier: single-mind-answer-provenance-v1
+                structured:
+                  summary: Structured output
+                  value:
+                    messageId: msg_550e840029b141d4a716446655440001
+                    content: '{"sentiment":"positive","confidence":0.95}'
+                    parsed:
+                      sentiment: positive
+                      confidence: 0.95
+                toolCall:
+                  summary: Tool call requested
+                  value:
+                    messageId: msg_550e840029b141d4a716446655440002
+                    content: ''
+                    tool_calls:
+                    - id: call_abc123
+                      name: get_weather
+                      arguments:
+                        city: Berlin
+                        units: celsius
+                knowledgeOnly:
+                  summary: Knowledge-only reply
+                  value:
+                    messageId: msg_550e840029b141d4a716446655440003
+                    content: The study describes classroom smartphone rules as…
+                    metadata:
+                      sourcePolicy: knowledge_only
+                      ragCitations:
+                      - id: abc123
+                        displaySource: teacher-archetypes.pdf
+                        sourceType: mind_knowledge
+                        similarity: 0.81
+                      knowledgeRetrieval:
+                        status: grounded
+                        retrievalAttempted: true
+                        chunksFound: 4
+                        sourceCount: 1
+                        sources:
+                        - title: teacher-archetypes.pdf
+                          sourceType: mind_knowledge
+            text/event-stream:
+              schema:
+                type: string
+                description: 'Server-Sent Events. Frames are `event: <name>` + `data: <JSON>`; `data` payloads match `MindCompletionSseEvent`. A 2 KB padding comment and a `start` frame are sent immediately, `: heartbeat` comments every 15 s while generating, then exactly one `result` (or `error`) frame followed by `done`.'
+              examples:
+                stream:
+                  summary: Full stream
+                  value: 'event: start
+
+                    data: {"type":"start","timestamp":1757239200000}
+
+
+                    : heartbeat
+
+
+                    event: result
+
+                    data: {"messageId":"msg_550e840029b141d4a716446655440000","content":"The study describes…","metadata":{"sourcePolicy":"knowledge_only"}}
+
+
+                    event: done
+
+                    data: {"type":"done"}
+
+
+                    '
+                error:
+                  summary: Failure inside the stream
+                  value: 'event: start
+
+                    data: {"type":"start","timestamp":1757239200000}
+
+
+                    event: error
+
+                    data: {"type":"error","status":409,"message":"This Mind is still training"}
+
+
+                    '
+          x-event-schema:
+            $ref: '#/components/schemas/MindCompletionSseEvent'
+        '400':
+          description: 'Validation error. Path/body: `Mind ID is required`, `Invalid Mind ID format`, `responseMode must be ''sync'' or ''stream''`, `sourcePolicy must be one of: auto, request_only, knowledge_only`, `citationMarkers must be one of: inline, none`, `messages[{i}].content must be a non-empty string for role "user" (omit messages or send an empty array for the greeting bootstrap)`, `sourcePolicy=knowledge_only cannot be combined with message attachments; upload them to Mind knowledge first`, invalid `response_format` / `tools` / `tool_choice` (see the schemas), `Unsupported provider: ''{provider}''. Supported providers: openai, anthropic, google.`, `Cannot auto-detect provider for model ''{model}''. Please specify a ''provider'' parameter (openai, anthropic, or google).`, `Unsupported model ''{model}'' for provider ''{provider}''. Supported models: …`. After generation started: `data.errorType: model_not_found` (the pinned model is unavailable), `invalid_prompt` (conversation too long or malformed), or `unsupported_model_capability` (`data.capability: tools | tool_choice`: the chosen model cannot call tools or honour a forced `tool_choice`; in stream mode the `error` frame carries `errorType`).'
+        '401':
+          description: Missing or invalid API key (`Unauthorized`).
+        '403':
+          description: 'Either `Access denied` (the access rule in the description is not met) or a plan limit: the monthly synthetic-response allowance is exhausted (`data.code: PLAN_LIMIT`, `limitType: responses`, `{Plan} plan monthly synthetic-response limit reached. Upgrade your plan for more responses.`, with `periodEnd` for the reset date). One response is reserved before generation and refunded if generation fails.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatPlanLimitError'
+        '404':
+          description: No Mind with this ID (`Mind not found`).
+        '409':
+          description: 'The Mind is not ready to chat (`data.code: SPARK_NOT_READY`): `This Mind is still training` (`trainingStatus: queued|running`) or `This Mind failed training and must be retrained before it can chat` (`trainingStatus: failed`). Poll `GET /v1/minds/{mindId}/training` until `readyToChat` is true, or retrain. Ephemeral demo Minds are exempt from this gate.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MindCompletionNotReadyError'
+        '429':
+          description: 'Rate limit exceeded: at most 30 completions per user per sliding 60 s window (`Too many requests — please try again shortly.`). Every response carries `X-RateLimit-Limit` and `X-RateLimit-Remaining`; a 429 adds `Retry-After` (seconds).'
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds until the window resets.
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+        '500':
+          description: 'Generation failed (`AI generation failed. Please try again in a moment.`, `data.errorType: ai_generation_error`). The reserved synthetic response is refunded.'
+        '503':
+          description: 'Usage metering is temporarily unavailable (`data.code: USAGE_METERING_UNAVAILABLE`); nothing was generated or charged, retry later.'
+      operationId: createMindCompletion
+      summary: Stateless completion with a Mind
+      description: 'Send a conversation to a single Mind and get its next reply without any server-side state: you own the history and resend it every call. Omit `messages` (or send `[]`) to get the Mind''s greeting. Supports OpenAI-style `response_format` (structured output), user-defined `tools` / `tool_choice` (function calling; calls are returned, never executed), file/link attachments via `messages[].metadata.attachedFiles`, a `model`/`provider` override, `language`, `sourcePolicy: "knowledge_only"` for fail-closed answers grounded only in the Mind''s uploaded knowledge, and `citationMarkers` to control inline `[[CITE:n]]` markers. Default `responseMode: "sync"` returns buffered JSON; `responseMode: "stream"` returns Server-Sent Events (`start`, heartbeat comments, then a single `result` frame with the same payload, then `done`) so long generations are not cut off by 100 s proxy timeouts. Access rule: you can chat with Minds you own, Minds shared with you directly or with your team, Minds inside an Audience you own, belong to, or that is shared with your team, and public Minds; anything else returns 403 Access denied. The Mind must be trained (`readyToChat: true` on `GET /v1/minds/{mindId}/training`) or you get 409 `SPARK_NOT_READY`. Each call consumes one synthetic response from your monthly allowance and counts against the 30 completions/minute rate limit.'
+      tags:
+      - Chat
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MindCompletionRequest'
+            examples:
+              single:
+                summary: Single question
+                value:
+                  messages:
+                  - role: user
+                    content: What are the top 3 marketing trends for 2026?
+              greeting:
+                summary: Greeting bootstrap
+                value:
+                  messages: []
+              multiTurn:
+                summary: Multi-turn with client-managed history
+                value:
+                  messages:
+                  - role: user
+                    content: What are the top marketing trends?
+                  - role: assistant
+                    content: AI personalization, short-form video, and community building…
+                  - role: user
+                    content: How can I implement AI personalization on a budget?
+              attachments:
+                summary: Attach a document
+                value:
+                  messages:
+                  - role: user
+                    content: Summarize the key points of this report.
+                    metadata:
+                      attachedFiles:
+                      - url: https://example.com/quarterly-report.pdf
+                        name: Q4 Report
+                        type: application/pdf
+              knowledgeOnly:
+                summary: Knowledge-only, plain prose, streamed
+                value:
+                  responseMode: stream
+                  sourcePolicy: knowledge_only
+                  citationMarkers: none
+                  messages:
+                  - role: user
+                    content: What does the study say about classroom smartphone rules?
+              structured:
+                summary: Structured output
+                value:
+                  messages:
+                  - role: user
+                    content: 'Analyze the sentiment of: I love this product, it exceeded all my expectations!'
+                  response_format:
+                    type: json_schema
+                    json_schema:
+                      name: sentiment_analysis
+                      schema:
+                        type: object
+                        properties:
+                          sentiment:
+                            type: string
+                            enum:
+                            - positive
+                            - negative
+                            - neutral
+                          confidence:
+                            type: number
+                            minimum: 0
+                            maximum: 1
+                        required:
+                        - sentiment
+                        - confidence
+              tools:
+                summary: Function calling
+                value:
+                  messages:
+                  - role: user
+                    content: What is the weather in Berlin?
+                  tools:
+                  - name: get_weather
+                    description: Get current weather for a city
+                    parameters:
+                      type: object
+                      properties:
+                        city:
+                          type: string
+                        units:
+                          type: string
+                          enum:
+                          - celsius
+                          - fahrenheit
+                      required:
+                      - city
+                  tool_choice: auto
+              modelOverride:
+                summary: Pin a model
+                value:
+                  model: gpt-4o-mini
+                  provider: openai
+                  language: de
+                  endUserName: Lena
+                  messages:
+                  - role: user
+                    content: Was hältst du von nachhaltiger Verpackung?
+components:
+  schemas:
+    ChatStudyMindsNotReadyError:
+      type: object
+      required:
+      - statusCode
+      - statusMessage
+      - data
+      properties:
+        statusCode:
+          type: integer
+          enum:
+          - 409
+        statusMessage:
+          type: string
+        data:
+          type: object
+          required:
+          - code
+          - studyId
+          - notReadyCount
+          - failedCount
+          - trainingCount
+          - notReady
+          properties:
+            code:
+              type: string
+              enum:
+              - PANEL_MINDS_NOT_READY
+            studyId:
+              type: string
+              format: uuid
+              description: The chat ID.
+            notReadyCount:
+              type: integer
+            failedCount:
+              type: integer
+              description: Minds whose training failed; retrain them with `POST /v1/minds/{mindId}/retrain`.
+            trainingCount:
+              type: integer
+              description: Minds still training; poll `GET /v1/minds/{mindId}/training`.
+            notReady:
+              type: array
+              items:
+                type: object
+                required:
+                - mindId
+                - name
+                - audienceId
+                - trainingStatus
+                properties:
+                  mindId:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                  audienceId:
+                    type: string
+                    format: uuid
+                  trainingStatus:
+                    type: string
+                    enum:
+                    - queued
+                    - running
+                    - failed
+    ChatCreateRequest:
+      type: object
+      description: Exactly one of `mindId`, `mindIds` or `audienceIds` selects the chat shape. `audienceIds` wins when present; otherwise `mindIds` wins over `mindId`.
+      properties:
+        responseThread:
+          type: object
+          additionalProperties: false
+          required:
+          - studyId
+          - messageId
+          description: Continue this Mind’s exact Study response with its prior context and assets. Requires one Mind. Repeated creation resumes the existing thread (200).
+          properties:
+            studyId:
+              type: string
+              format: uuid
+            messageId:
+              type: string
+        name:
+          type: string
+          description: Display name. Defaults to "API Chat" for Mind chats and "API Study" for Study chats.
+        description:
+          type: string
+          description: Optional free-text description.
+        mindId:
+          type: string
+          format: uuid
+          description: Single Mind to chat with 1:1.
+        mindIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Two or more Minds for a moderated multi-Mind conversation (duplicates are ignored). A single-element array behaves like `mindId`.
+        audienceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Audiences to attach to a Study chat. Every message fans out to all Minds in these Audiences.
+    StudyOutputData:
+      type: object
+      required:
+      - title
+      - type
+      - audiences
+      properties:
+        title:
+          type: string
+        type:
+          type: string
+          enum:
+          - scale
+          - categorical
+          - multiselect
+          - qualitative
+        classification:
+          $ref: '#/components/schemas/StudyQuestionClassification'
+        categoryCodebook:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyCategoryCodebookEntry'
+        audiences:
+          type: array
+          deprecated: true
+          description: Deprecated alias for audiences.
+          items:
+            $ref: '#/components/schemas/StudyOutputAudience'
+    MindCompletionStartEvent:
+      type: object
+      required:
+      - type
+      - timestamp
+      properties:
+        type:
+          type: string
+          enum:
+          - start
+        timestamp:
+          type: integer
+          description: Unix epoch milliseconds when generation began.
+    MindCompletionCitation:
+      type: object
+      required:
+      - id
+      - displaySource
+      properties:
+        id:
+          type: string
+        displaySource:
+          type: string
+          description: Human-readable source name, file name or URL host.
+        rawLink:
+          type: string
+          format: uri
+        title:
+          type: string
+        snippet:
+          type: string
+        similarity:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Relevance score for knowledge and web sources.
+        sourceType:
+          type: string
+          enum:
+          - mind_knowledge
+          - web
+          - link
+          - document
+    ChatMessageRequest:
+      type: object
+      description: Send `content` (or its alias `message`). Everything else is optional; `model`/`provider`, `response_format`, `tools` and `tool_choice` are validated for every chat shape but only applied on single-Mind chats.
+      properties:
+        content:
+          type: string
+          minLength: 1
+          description: Message text. Required unless `message` is given.
+        message:
+          type: string
+          description: Alias for `content`. `message` wins when both are present.
+        role:
+          type: string
+          enum:
+          - user
+          - system
+          default: user
+          description: '`user` triggers a reply. `system` stores the text in the transcript as context for later turns and returns immediately without calling the model or counting against message caps.'
+        model:
+          type: string
+          description: Per-message model override for single-Mind chats. Must be one of the supported IDs for `provider` (e.g. `claude-sonnet-5`, `gpt-5.4`, `gemini-3.7-flash`); retired IDs are forwarded to their replacement. Must be sent together with `provider`.
+        provider:
+          type: string
+          enum:
+          - anthropic
+          - openai
+          - google
+          description: 'Provider of `model`. Must be sent together with `model`. Precedence: request override, then your team''s preferred provider, then the product default.'
+        endUserName:
+          type:
+          - string
+          - 'null'
+          maxLength: 120
+          description: 'Display name of the human end user for this turn. Omitted/empty means the Mind addresses the user neutrally (never the API-key owner''s name). Aliases: `userDisplayName`, `userName`.'
+        response_format:
+          $ref: '#/components/schemas/ChatResponseFormat'
+        tools:
+          type: array
+          maxItems: 128
+          items:
+            $ref: '#/components/schemas/ChatToolDefinition'
+          description: User-defined tools (function calling). Calls are returned in `tool_calls` for you to execute; they are never run server-side. Single-Mind chats only.
+        tool_choice:
+          $ref: '#/components/schemas/ChatToolChoice'
+    MindCompletionMessage:
+      type: object
+      required:
+      - role
+      properties:
+        role:
+          type: string
+          enum:
+          - user
+          - assistant
+          - tool
+          - system
+        content:
+          description: 'Message text. Must be a non-empty string for `user` (whitespace-only is rejected with 400); may be empty for `assistant`. An array of content parts (`{ type: "text", text }`) is also accepted.'
+          oneOf:
+          - type: string
+          - type: array
+            items:
+              type: object
+              additionalProperties: true
+        tool_calls:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatToolCall'
+          description: 'On `assistant` messages: the tool calls the Mind made in that turn, echoed back verbatim.'
+        tool_call_id:
+          type: string
+          description: 'On `tool` messages: the `id` of the call this result answers. `content` is the tool result (typically a JSON string).'
+        metadata:
+          type: object
+          description: Per-message metadata. Only `attachedFiles` is read.
+          properties:
+            attachedFiles:
+              type: array
+              items:
+                $ref: '#/components/schemas/MindCompletionAttachment'
+              description: 'Files, images or web pages to process (PDF, DOCX, TXT/MD, CSV/XLSX, PNG/JPG/WEBP, HTML). Processed in parallel (30 s per file) before the Mind sees the message; the extracted content is appended to the last user message but never persisted. Attachments are deduplicated by `url` across the whole history. Not allowed with `sourcePolicy: "knowledge_only"`.'
+    ChatCreated:
+      type: object
+      required:
+      - id
+      - name
+      - createdAt
+      - minds
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Chat ID for `POST /v1/chats/{chatId}/messages` and `DELETE /v1/chats/{chatId}`.
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        createdAt:
+          type: string
+          format: date-time
+        minds:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyMind'
+          description: Minds assigned to the chat. One entry for a 1:1 chat, several for a multi-Mind chat.
+    MindCompletionRequest:
+      type: object
+      properties:
+        messages:
+          type: array
+          description: 'Conversation in chronological order, ending with a `user` message. Omit or send `[]` for the greeting bootstrap. With `sourcePolicy: "knowledge_only"` only the last `user` message is sent to the model.'
+          items:
+            $ref: '#/components/schemas/MindCompletionMessage'
+        responseMode:
+          type: string
+          enum:
+          - sync
+          - stream
+          default: sync
+          description: '`sync` buffers the whole reply into one JSON response. `stream` answers with `text/event-stream` and delivers the same payload in a terminal `result` frame; use it whenever generation may exceed ~60 s (web search, large attachments).'
+        model:
+          type: string
+          description: Model override, e.g. `claude-sonnet-5`, `gpt-5.4`, `gpt-4o-mini`, `gemini-3.7-flash`. Provider is auto-detected from the `claude-`, `gemini-`, `gpt-`/`o1`/`o3`/`o4`/`chatgpt-` prefixes; retired IDs are forwarded to their replacement. Without an override the team's preferred provider (if any) or the product default is used.
+        modelConnection:
+          type: object
+          additionalProperties: false
+          required:
+          - id
+          - revision
+          properties:
+            id:
+              type: string
+              format: uuid
+            revision:
+              type: integer
+              minimum: 1
+          description: Explicit verified team connection. Cannot be combined with model/provider. Requires streaming, and tools/structured capabilities when used. Errors never fall back to a native model.
+        provider:
+          type: string
+          enum:
+          - openai
+          - anthropic
+          - google
+          description: Provider of `model`. Required only when the provider cannot be auto-detected from the model name.
+        language:
+          type: string
+          enum:
+          - en
+          - es
+          - fr
+          - de
+          - zh
+          - tr
+          - ar
+          - ja
+          - ko
+          description: Reply language hint. Falls back to the `x-locale` header, then `en`. Strong personas may still answer in their native language.
+        endUserName:
+          type:
+          - string
+          - 'null'
+          maxLength: 120
+          description: 'Display name of the human end user. Omitted/empty means the Mind addresses the user neutrally and never infers the API-key owner''s name. Aliases: `userDisplayName`, `userName`.'
+        sourcePolicy:
+          type: string
+          enum:
+          - auto
+          - knowledge_only
+          - request_only
+          default: auto
+          description: '`auto` lets the Mind use its knowledge, web search, link analysis and attachments. `knowledge_only` is fail-closed: it retrieves the Mind''s processed knowledge for the last user message, disables every internal and user tool, rejects attachments, and answers from persona only when nothing relevant is found (recorded in `metadata.knowledgeRetrieval.status: "fallback"`). A Mind saved with `knowledge_only` can never be downgraded per request. `request_only` is accepted for parity with Study runs and behaves like `auto` here.'
+        citationMarkers:
+          type: string
+          enum:
+          - inline
+          - none
+          default: inline
+          description: '`inline` leaves `[[CITE:n]]` markers (0-based indexes into `metadata.ragCitations`) after grounded claims in `content`. `none` strips them; `metadata.ragCitations` still lists the sources.'
+        response_format:
+          $ref: '#/components/schemas/ChatResponseFormat'
+        tools:
+          type: array
+          maxItems: 128
+          items:
+            $ref: '#/components/schemas/ChatToolDefinition'
+          description: 'User-defined tools. Calls are returned in `tool_calls`; execute them yourself and send the result back as a `tool` message. Ignored with `sourcePolicy: "knowledge_only"`.'
+        tool_choice:
+          $ref: '#/components/schemas/ChatToolChoice'
+        parallel_tool_calls:
+          type: boolean
+          default: true
+          description: 'Accepted for OpenAI compatibility. Advisory only: the runtime does not currently constrain how many tool calls a turn may contain.'
+        participants:
+          type: array
+          items:
+            type: string
+          description: Names of other participants when the Mind is one voice in a wider conversation. When non-empty the Mind answers in multi-participant mode instead of 1:1 interview mode.
+    MindCompletionSseEvent:
+      oneOf:
+      - $ref: '#/components/schemas/MindCompletionStartEvent'
+      - $ref: '#/components/schemas/MindCompletionResponse'
+      - $ref: '#/components/schemas/MindCompletionErrorEvent'
+      - $ref: '#/components/schemas/MindCompletionDoneEvent'
+      description: '`data` payloads by frame: `start` → MindCompletionStartEvent, `result` → MindCompletionResponse, `error` → MindCompletionErrorEvent, `done` → MindCompletionDoneEvent. Lines starting with `:` are heartbeats and carry no data.'
+    ChatToolCall:
+      type: object
+      required:
+      - id
+      - name
+      - arguments
+      properties:
+        id:
+          type: string
+          description: Echo this back as `tool_call_id` when you send the result.
+        name:
+          type: string
+          description: Name of one of your `tools`.
+        arguments:
+          type: object
+          additionalProperties: true
+          description: Arguments generated by the Mind, matching the tool's `parameters` schema.
+    StudyCitationProvenance:
+      type: object
+      required:
+      - mode
+      - status
+      - recordedAt
+      - verifier
+      properties:
+        mode:
+          type: string
+          enum:
+          - generation
+          - retroactive
+        status:
+          type: string
+          enum:
+          - attributed
+          - verified
+          - partial
+          - unavailable
+        recordedAt:
+          type: string
+          format: date-time
+        verifier:
+          type: string
+          enum:
+          - study-citations-v1
+        reason:
+          type: string
+          enum:
+          - no_evidence
+          - no_claims
+          - timeout
+          - error
+          description: 'Only when status is unavailable: why no sources could be attributed.'
+    ChatSystemMessageResponse:
+      type: object
+      description: 'Returned for `role: "system"`; nothing was generated.'
+      required:
+      - messageId
+      - role
+      properties:
+        messageId:
+          type: string
+        role:
+          type: string
+          enum:
+          - system
+    MindCompletionResponse:
+      type: object
+      required:
+      - messageId
+      - content
+      properties:
+        messageId:
+          type: string
+          description: Opaque per-call ID (`msg_` + 32 hex chars). Nothing is persisted; use it for your own correlation.
+        content:
+          type: string
+          description: The Mind's reply. A JSON string when `response_format` was `json_schema`/`json_object`; empty when the turn ended in `tool_calls` or an image-only result.
+        parsed:
+          description: Parsed structured output. Present only when `response_format` was given and extraction succeeded.
+        tool_calls:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatToolCall'
+          description: Present only when the Mind called one of your `tools`.
+        metadata:
+          $ref: '#/components/schemas/MindCompletionMetadata'
+    StudyMind:
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        discipline:
+          type:
+          - string
+          - 'null'
+        profileImageUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+    ChatMessageResponse:
+      oneOf:
+      - $ref: '#/components/schemas/ChatMindMessageResponse'
+      - $ref: '#/components/schemas/ChatMultiMindMessageResponse'
+      - $ref: '#/components/schemas/ChatStudyMessageResponse'
+      - $ref: '#/components/schemas/ChatSystemMessageResponse'
+    StudyOutputAnswer:
+      type: object
+      required:
+      - value
+      - persona
+      - message
+      properties:
+        value:
+          type: string
+        rawValue:
+          type: string
+        persona:
+          type: string
+        discipline:
+          type:
+          - string
+          - 'null'
+        message:
+          type: string
+        imageUrl:
+          type:
+          - string
+          - 'null'
+        reliabilityScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+        citationSources:
+          type: array
+          description: Claim-level sources referenced by zero-based [N] markers in message.
+          items:
+            $ref: '#/components/schemas/StudyCitationSource'
+        citationProvenance:
+          $ref: '#/components/schemas/StudyCitationProvenance'
+        answerProvenance:
+          $ref: '#/components/schemas/StudyAnswerProvenance'
+    StudyOutputAudience:
+      type: object
+      required:
+      - audience
+      - value
+      - answers
+      properties:
+        audience:
+          type: string
+          deprecated: true
+          description: Deprecated alias for audience.
+        value:
+          type: string
+        alignmentScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyOutputAnswer'
+    StudyCategoryCodebookEntry:
+      type: object
+      required:
+      - label
+      - originalLabels
+      - count
+      properties:
+        label:
+          type: string
+        originalLabels:
+          type: array
+          items:
+            type: string
+        count:
+          type: integer
+          minimum: 0
+    ChatResponseFormat:
+      type: object
+      description: 'OpenAI-style structured output request. `json_schema` runs a second extraction pass over the Mind''s answer; `json_object` parses the answer as JSON (code fences are stripped). The parsed value is returned in `parsed`; `content` carries the JSON string. Extraction failures are soft: `parsed` is omitted and `content` keeps the prose.'
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - text
+          - json_object
+          - json_schema
+        json_schema:
+          type: object
+          description: Required when `type` is `json_schema`.
+          required:
+          - name
+          - schema
+          properties:
+            name:
+              type: string
+              minLength: 1
+            description:
+              type: string
+              description: Guides the extraction model.
+            schema:
+              type: object
+              description: JSON Schema for the output object.
+              additionalProperties: true
+            strict:
+              type: boolean
+              default: true
+    ChatMindMessageResponse:
+      type: object
+      description: Single-Mind chat reply.
+      required:
+      - content
+      - messageId
+      properties:
+        content:
+          type: string
+          description: The Mind's reply. A JSON string when `response_format` was `json_schema`/`json_object`; may be empty when the turn ended in `tool_calls`.
+        messageId:
+          type: string
+          description: ID of the persisted assistant message.
+        parsed:
+          description: Parsed structured output. Present only when `response_format` was given and extraction succeeded.
+        tool_calls:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatToolCall'
+          description: Present only when the Mind called one of your `tools`. Execute them and send the results in a follow-up message.
+    ChatToolChoice:
+      description: '`auto` lets the Mind decide, `required` forces at least one call, `none` disables user tools for this turn, `{ "name": "…" }` forces one specific tool. Ignored when `tools` is empty.'
+      oneOf:
+      - type: string
+        enum:
+        - auto
+        - required
+        - none
+      - type: object
+        required:
+        - name
+        properties:
+          name:
+            type: string
+            minLength: 1
+    ChatPlanLimitError:
+      type: object
+      description: Shape of every 403 plan-limit refusal on the Chat endpoints. `data.code` is always `PLAN_LIMIT`; `limitType` says which cap was hit.
+      required:
+      - statusCode
+      - statusMessage
+      - data
+      properties:
+        statusCode:
+          type: integer
+          enum:
+          - 403
+        statusMessage:
+          type: string
+          description: Human-readable wall copy, e.g. `Free plan limit reached` or `Free plan monthly synthetic-response limit reached. Upgrade your plan for more responses.`
+        data:
+          type: object
+          required:
+          - code
+          - limitType
+          - currentPlan
+          - limit
+          properties:
+            code:
+              type: string
+              enum:
+              - PLAN_LIMIT
+            limitType:
+              type: string
+              enum:
+              - flows
+              - messages
+              - responses
+              - audienceMembers
+              description: '`flows`: started-Study cap. `messages`: per-chat user-message cap. `responses`: monthly synthetic-response allowance. `audienceMembers`: per-Audience member cap.'
+            currentPlan:
+              type: string
+              description: Plan slug, e.g. `free`, `premium`, `team`.
+            limit:
+              type: integer
+            current:
+              type: integer
+              description: Usage against the cap, when known.
+            requested:
+              type: integer
+              description: Units this request needed (response metering only).
+            periodEnd:
+              type: string
+              format: date-time
+              description: When the monthly response allowance resets (response metering only).
+            context:
+              type: string
+              enum:
+              - chatCreation
+              - studyCreation
+              - sharedStudyUsage
+              - sharedMindUsage
+              description: Which surface hit the wall, when the gate knows it.
+            source:
+              type: string
+              description: Usage-metering source tag, e.g. `api_v1`.
+            isTrialing:
+              type: boolean
+            audienceId:
+              type: string
+              format: uuid
+              description: Offending Audience (`audienceMembers` only).
+    StudyQuestionClassification:
+      type: object
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - scale
+          - categorical
+          - multiselect
+          - qualitative
+        scaleRange:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: number
+        options:
+          type: array
+          items:
+            type: string
+        responseMode:
+          type: string
+          enum:
+          - everyday
+          - standard_qualitative
+          - deliberative_values
+          - scale
+          - categorical
+          - factual_research
+          description: Answer-depth and grounding policy, orthogonal to the structured response type.
+    MindCompletionAttachment:
+      type: object
+      description: Provide either `url` or `path`, not both. Files without a resolvable `url` are skipped.
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Public HTTP(S) URL of the file or web page.
+        path:
+          type: string
+          description: Supabase storage path of an uploaded file (signed automatically).
+        name:
+          type: string
+          description: Display name shown to the Mind.
+        type:
+          type: string
+          description: MIME type, e.g. `application/pdf`, `image/png`.
+        description:
+          type: string
+        transcription:
+          type: string
+          description: Pre-transcribed audio/video content.
+    ChatStudyMessageResponse:
+      type: object
+      description: 'Study chat reply: the question is classified, every ready Mind answers, and answers are aggregated per Audience.'
+      required:
+      - outputData
+      properties:
+        outputData:
+          $ref: '#/components/schemas/StudyOutputData'
+    MindCompletionDoneEvent:
+      type: object
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - done
+    ChatStudyCreated:
+      type: object
+      required:
+      - id
+      - name
+      - type
+      - audiences
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+          - study
+        audiences:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatAudienceSummary'
+        createdAt:
+          type: string
+          format: date-time
+    MindCompletionImage:
+      type: object
+      required:
+      - id
+      - url
+      - filename
+      - description
+      - source
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+          format: uri
+        filename:
+          type: string
+        description:
+          type: string
+        source:
+          type: string
+          description: '`generated` for AI-generated images, otherwise where the displayed image came from (e.g. `memory`).'
+        path:
+          type: string
+        provider:
+          type: string
+          description: Image generation provider (generated images only).
+        size:
+          type: string
+          description: e.g. `1024x1024` (generated images only).
+    MindCompletionErrorEvent:
+      type: object
+      description: Sent instead of `result` when the completion failed after the stream opened. `status` is the HTTP status the same request would have received in `sync` mode.
+      required:
+      - type
+      - status
+      - message
+      properties:
+        type:
+          type: string
+          enum:
+          - error
+        status:
+          type: integer
+          description: e.g. 400, 401, 403, 404, 409, 429, 500, 503.
+        message:
+          type: string
+          description: The `statusMessage` of the underlying error.
+    MindCompletionNotReadyError:
+      type: object
+      required:
+      - statusCode
+      - statusMessage
+      - data
+      properties:
+        statusCode:
+          type: integer
+          enum:
+          - 409
+        statusMessage:
+          type: string
+          enum:
+          - This Mind is still training
+          - This Mind failed training and must be retrained before it can chat
+        data:
+          type: object
+          required:
+          - code
+          - mindId
+          - trainingStatus
+          properties:
+            code:
+              type: string
+              enum:
+              - SPARK_NOT_READY
+            mindId:
+              type: string
+              format: uuid
+            trainingStatus:
+              type: string
+              enum:
+              - queued
+              - running
+              - failed
+    ChatMultiMindMessageResponse:
+      type: object
+      description: 'Multi-Mind chat reply: one entry per Mind that spoke this turn, in speaking order.'
+      required:
+      - messages
+      properties:
+        messages:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+            - content
+            - messageId
+            - mind
+            properties:
+              content:
+                type: string
+              messageId:
+                type: string
+              mind:
+                type: object
+                required:
+                - id
+                - name
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+    MindCompletionAnswerProvenance:
+      type: object
+      description: Answer-level origin recorded on every reply. Exact claim citations (`ragCitations` + `chatCitationProvenance`) take precedence when present.
+      required:
+      - origin
+      - sourcePolicy
+      - retrievalAttempted
+      - retrievalChunksFound
+      - evidenceSourceTypes
+      - fallbackStatus
+      - unsupported
+      - recordedAt
+      - verifier
+      properties:
+        origin:
+          type: string
+          enum:
+          - cited_sources
+          - mind_knowledge
+          - request_evidence
+          - mind_personality
+          - unsupported
+        sourcePolicy:
+          type: string
+          enum:
+          - auto
+          - knowledge_only
+          - request_only
+        retrievalAttempted:
+          type: boolean
+        retrievalChunksFound:
+          type: integer
+          minimum: 0
+        evidenceSourceTypes:
+          type: array
+          items:
+            type: string
+            enum:
+            - mind_knowledge
+            - web
+            - request_evidence
+            - mind_personality
+        fallbackStatus:
+          type: string
+          enum:
+          - grounded
+          - persona_profile
+          - uncertainty_required
+        unsupported:
+          type: boolean
+          description: True when a factual question could not be grounded; the Mind was instructed to express uncertainty.
+        recordedAt:
+          type: string
+          format: date-time
+        verifier:
+          type: string
+          enum:
+          - single-mind-answer-provenance-v1
+    ChatToolDefinition:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Unique per request. Must not collide with the internal tool names `GET_SPARK_RAG`, `GENERATE_IMAGE`, `WEB_SEARCH`, `DISPLAY_IMAGE`, `GET_IMAGE_DETAILS`, `DOCUMENT_PROCESSING`, `ANALYZE_LINK`.
+        description:
+          type: string
+          description: When and how the Mind should call the tool. Drives tool selection.
+        parameters:
+          type: object
+          description: JSON Schema of the arguments. Omit for a no-argument tool.
+          additionalProperties: true
+        strict:
+          type: boolean
+          description: Enforce strict argument validation.
+    MindCompletionKnowledgeRetrieval:
+      type: object
+      description: 'Source-safe retrieval summary for `sourcePolicy: "knowledge_only"`. Titles only; storage paths and raw file contents are never returned.'
+      required:
+      - status
+      - retrievalAttempted
+      - chunksFound
+      - sourceCount
+      - sources
+      properties:
+        status:
+          type: string
+          enum:
+          - grounded
+          - fallback
+          description: '`grounded` when relevant knowledge chunks were used; `fallback` when none matched and the Mind answered from persona/cohort profile only.'
+        retrievalAttempted:
+          type: boolean
+          description: False when the request had no user question to retrieve for.
+        chunksFound:
+          type: integer
+          minimum: 0
+          description: Chunks used for this answer (not the Mind's total embedding count).
+        sourceCount:
+          type: integer
+          minimum: 0
+        sources:
+          type: array
+          items:
+            type: object
+            required:
+            - title
+            - sourceType
+            properties:
+              title:
+                type: string
+              sourceType:
+                type: string
+                enum:
+                - mind_knowledge
+    MindCompletionMetadata:
+      type: object
+      description: Present only when at least one field applies. Internal tools (knowledge retrieval, web search, image display/generation, link analysis, document processing) surface their results here, never in `tool_calls`.
+      properties:
+        ragCitations:
+          type: array
+          items:
+            $ref: '#/components/schemas/MindCompletionCitation'
+          description: Verified knowledge, web, link and document sources. Inline `[[CITE:n]]` markers in `content` index into this array (0-based).
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/MindCompletionImage'
+          description: Images the Mind displayed or generated. URLs are absolute.
+        documentAnalysis:
+          type: string
+          description: Analysis text of the last processed attachment, when any.
+        chatCitationProvenance:
+          $ref: '#/components/schemas/StudyCitationProvenance'
+        sourcePolicy:
+          type: string
+          enum:
+          - knowledge_only
+          description: Present only for a knowledge-only reply.
+        knowledgeRetrieval:
+          $ref: '#/components/schemas/MindCompletionKnowledgeRetrieval'
+        answerProvenance:
+          $ref: '#/components/schemas/MindCompletionAnswerProvenance'
+    StudyCitationSource:
+      type: object
+      required:
+      - id
+      - title
+      - sourceType
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        domain:
+          type: string
+        sourceType:
+          type: string
+          enum:
+          - mind_knowledge
+          - web
+        similarity:
+          type: number
+    ChatAudienceSummary:
+      type: object
+      required:
+      - id
+      - name
+      - mindCount
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        mindCount:
+          type: integer
+          minimum: 0
+          description: Number of Minds in the Audience at creation time.
+    StudyAnswerProvenance:
+      type: object
+      required:
+      - origin
+      - sourcePolicy
+      - retrievalAttempted
+      - retrievalChunksFound
+      - retrievalChunksUsed
+      - evidenceSourceTypes
+      - fallbackStatus
+      - unsupported
+      - sharedEmbeddingReuse
+      - recordedAt
+      - verifier
+      properties:
+        origin:
+          type: string
+          description: Canonical answer origin. `group_grounding` was renamed to `audience_grounding`; it is still listed so a response recorded before the rename validates.
+          enum:
+          - cited_sources
+          - mind_knowledge
+          - mind_personality
+          - request_evidence
+          - audience_grounding
+          - group_grounding
+          - unsupported
+        originLegacy:
+          type: string
+          deprecated: true
+          description: Pre-rename spelling of `origin`, present only when one exists. Switch to `origin`; this field will be removed.
+          enum:
+          - group_grounding
+        sourcePolicy:
+          type: string
+          enum:
+          - auto
+          - knowledge_only
+        retrievalAttempted:
+          type: boolean
+        retrievalChunksFound:
+          type: integer
+          minimum: 0
+        retrievalChunksUsed:
+          type: integer
+          minimum: 0
+        evidenceSourceTypes:
+          type: array
+          items:
+            type: string
+        fallbackStatus:
+          type: string
+          enum:
+          - grounded
+          - persona_profile
+          - uncertainty_required
+        unsupported:
+          type: boolean
+        sharedEmbeddingReuse:
+          type: boolean
+        recordedAt:
+          type: string
+          format: date-time
+        verifier:
+          type: string
+          enum:
+          - study-answer-provenance-v1
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'

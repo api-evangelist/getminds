@@ -18,7 +18,7 @@ tags:
 - Marketing Analytics
 - ai-personas
 - MCP
-- agent-native
+- Agent-Native
 - GDPR
 tags_raw:
 - synthetic-research
@@ -36,57 +36,16 @@ url: https://raw.githubusercontent.com/api-evangelist/getminds/refs/heads/main/a
 created: '2026-09-20'
 modified: '2026-09-20'
 apis:
-- name: Minds Public API
-  description: >-
-    REST v1 API for Minds (AI personas), Audiences, Studies, knowledge, chat,
-    research runs, analytics and exports. JSON over HTTPS, bearer API-key auth
-    (minds_ prefix), durable async jobs with polling, and a consistent error
-    envelope. OpenAPI 3.1.0 with 103 operations.
-  humanURL: https://getminds.ai/docs/api/overview
-  baseURL: https://getminds.ai/api/v1
-  tags:
-  - Synthetic Research
-  - Market Research
-  - ai-personas
-  - agent-native
-  tags_raw:
-  - synthetic-research
-  - market-research
-  - ai-personas
-  - agent-native
-  - AI Personas
-  properties:
-  - type: OpenAPI
-    url: openapi/getminds-openapi.json
-  - type: OpenAPI
-    url: https://getminds.ai/_openapi.json
-  - type: Documentation
-    url: https://getminds.ai/docs/api/overview
-  - type: APIReference
-    url: https://getminds.ai/docs/api/reference
-  - type: LLMsTxt
-    url: https://getminds.ai/llms.txt
-  - type: Authentication
-    url: authentication/getminds-authentication.yml
-  - type: Conventions
-    url: conventions/getminds-conventions.yml
-  - type: ErrorCatalog
-    url: errors/getminds-problem-types.yml
-  - type: DataModel
-    url: data-model/getminds-data-model.yml
-  - type: Overlay
-    url: overlays/getminds-openapi-overlay.yaml
 - name: Minds MCP Server
   description: >-
-    Hosted, agent-native MCP server (streamable-http) exposing 23 published tools
-    for creating grounded Audiences, planning and running multi-question Studies,
-    asking standalone questions, heatmaps, summaries and exports. Auth via OAuth
-    2.0 (PKCE + dynamic client registration) or a Minds API key.
+    Hosted, agent-native MCP server (streamable-http) exposing 23 published tools for creating grounded
+    Audiences, planning and running multi-question Studies, asking standalone questions, heatmaps, summaries
+    and exports. Auth via OAuth 2.0 (PKCE + dynamic client registration) or a Minds API key.
   humanURL: https://getminds.ai/mcp/overview
   baseURL: https://getminds.ai/mcp
   tags:
   - MCP
-  - agent-native
+  - Agent-Native
   - Synthetic Research
   tags_raw:
   - mcp
@@ -103,7 +62,345 @@ apis:
     url: scopes/getminds-scopes.yml
   - type: Documentation
     url: https://getminds.ai/mcp/tools
+- aid: getminds:getminds-agent-runs-api
+  name: Minds Agent Runs API
+  description: The Agent Runs API from Minds — 3 operation(s) for agent runs.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Agent Runs
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-agent-runs-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-api-keys-api
+  name: Minds API Keys API
+  description: The API Keys API from Minds — 2 operation(s) for api keys.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - API Keys
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-api-keys-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-audiences-api
+  name: Minds Audiences API
+  description: The Audiences API from Minds — 24 operation(s) for audiences.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Audiences
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-audiences-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-auth-api
+  name: Minds Auth API
+  description: The Auth API from Minds — 1 operation(s) for auth.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Auth
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-auth-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-chat-api
+  name: Minds Chat API
+  description: The Chat API from Minds — 4 operation(s) for chat.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Chat
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-chat-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-knowledge-api
+  name: Minds Knowledge API
+  description: The Knowledge API from Minds — 5 operation(s) for knowledge.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Knowledge
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-knowledge-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-meta-api
+  name: Minds Meta API
+  description: The Meta API from Minds — 1 operation(s) for meta.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Meta
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-meta-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-minds-api
+  name: Minds Minds API
+  description: The Minds API from Minds — 12 operation(s) for minds.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Minds
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-minds-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-models-api
+  name: Minds Models API
+  description: The Models API from Minds — 1 operation(s) for models.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Models
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-models-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-research-api
+  name: Minds Research API
+  description: The Research API from Minds — 5 operation(s) for research.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Research
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-research-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-studies-api
+  name: Minds Studies API
+  description: The Studies API from Minds — 18 operation(s) for studies.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Studies
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-studies-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-study-drafts-api
+  name: Minds Study Drafts API
+  description: The Study Drafts API from Minds — 3 operation(s) for study drafts.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Study Drafts
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-study-drafts-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-study-runs-api
+  name: Minds Study Runs API
+  description: The Study Runs API from Minds — 1 operation(s) for study runs.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Study Runs
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-study-runs-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-study-templates-api
+  name: Minds Study Templates API
+  description: The Study Templates API from Minds — 3 operation(s) for study templates.
+  humanURL: https://getminds.ai/docs/api/overview
+  baseURL: https://getminds.ai/api/v1
+  tags:
+  - Study Templates
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-study-templates-api-openapi.yml
+  - type: Documentation
+    url: https://getminds.ai/docs/api/overview
+  - type: APIReference
+    url: https://getminds.ai/docs/api/reference
+  - type: LLMsTxt
+    url: https://getminds.ai/llms.txt
+  - type: Authentication
+    url: authentication/getminds-authentication.yml
+  - type: Conventions
+    url: conventions/getminds-conventions.yml
+  - type: ErrorCatalog
+    url: errors/getminds-problem-types.yml
+  - type: DataModel
+    url: data-model/getminds-data-model.yml
 common:
+- type: Overlay
+  url: overlays/getminds-openapi-overlay.yaml
 - type: Website
   url: https://getminds.ai
 - type: DeveloperPortal

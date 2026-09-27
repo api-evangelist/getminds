@@ -1,0 +1,331 @@
+openapi: 3.2.0
+info:
+  title: Minds Public Study Drafts API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: Study Drafts
+paths:
+  /api/v1/study-drafts/{id}:
+    delete:
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Study draft deleted.
+        '401':
+          description: Unauthorized.
+        '404':
+          description: Study draft not found.
+      operationId: deleteStudyDraft
+      summary: Delete a Study draft
+      tags:
+      - Study Drafts
+      security:
+      - ApiKeyAuth: []
+    get:
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Owned Study draft.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/StudyDraft'
+        '401':
+          description: Unauthorized.
+        '404':
+          description: Study draft not found.
+      operationId: getStudyDraft
+      summary: Get a Study draft
+      tags:
+      - Study Drafts
+      security:
+      - ApiKeyAuth: []
+    patch:
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Updated Study draft.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/StudyDraft'
+        '401':
+          description: Unauthorized.
+        '404':
+          description: Study draft not found.
+        '409':
+          description: Stale revision or consumed draft.
+        '413':
+          description: Payload too large.
+      operationId: updateStudyDraft
+      summary: Update a Study draft
+      description: Save an exact planning snapshot using optimistic revision compare-and-swap. A successful update increments revision.
+      tags:
+      - Study Drafts
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - expectedRevision
+              properties:
+                expectedRevision:
+                  type: integer
+                  minimum: 1
+                name:
+                  type: string
+                mode:
+                  type: string
+                  enum:
+                  - quick
+                  - custom
+                currentStep:
+                  type: string
+                payload:
+                  $ref: '#/components/schemas/StudyDraftPayload'
+  /api/v1/study-drafts/{id}/consume:
+    post:
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Consumed Study draft.
+        '401':
+          description: Unauthorized.
+        '404':
+          description: Study draft not found.
+        '409':
+          description: Stale revision.
+      operationId: consumeStudyDraft
+      summary: Consume a Study draft after launch
+      description: Idempotently closes a draft after its Study crosses the durable execution boundary. The consumed tombstone prevents delayed clients from recreating the draft.
+      tags:
+      - Study Drafts
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - expectedRevision
+              properties:
+                expectedRevision:
+                  type: integer
+                  minimum: 1
+                studyId:
+                  type:
+                  - string
+                  - 'null'
+                  format: uuid
+  /api/v1/study-drafts:
+    get:
+      parameters: []
+      responses:
+        '200':
+          description: Active Study drafts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StudyDraft'
+        '401':
+          description: Unauthorized.
+      operationId: listStudyDrafts
+      summary: List active Study drafts
+      description: List only draft and starting Study drafts owned by the authenticated user, newest first.
+      tags:
+      - Study Drafts
+      security:
+      - ApiKeyAuth: []
+    post:
+      parameters: []
+      responses:
+        '201':
+          description: Study draft created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/StudyDraft'
+        '401':
+          description: Unauthorized.
+        '409':
+          description: The supplied draft ID already exists.
+        '413':
+          description: The versioned payload exceeds the allowed size.
+      operationId: createStudyDraft
+      summary: Create a durable Study draft
+      description: Create a resumable Quick or Custom Study planning snapshot. This does not start research.
+      tags:
+      - Study Drafts
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudyDraftCreateInput'
+components:
+  schemas:
+    StudyDraftPayload:
+      type: object
+      required:
+      - version
+      - state
+      additionalProperties: true
+      properties:
+        version:
+          type: integer
+          enum:
+          - 1
+        state:
+          type: object
+          additionalProperties: true
+    StudyDraft:
+      type: object
+      required:
+      - id
+      - userId
+      - name
+      - mode
+      - currentStep
+      - revision
+      - status
+      - payload
+      - studyId
+      - startRequestId
+      - startLeaseExpiresAt
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        mode:
+          type: string
+          enum:
+          - quick
+          - custom
+        currentStep:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum:
+          - draft
+          - starting
+          - consumed
+        payload:
+          $ref: '#/components/schemas/StudyDraftPayload'
+        studyId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        startRequestId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        startLeaseExpiresAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    StudyDraftCreateInput:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        mode:
+          type: string
+          enum:
+          - quick
+          - custom
+        currentStep:
+          type: string
+        payload:
+          $ref: '#/components/schemas/StudyDraftPayload'
+        idempotencyKey:
+          type: string
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'

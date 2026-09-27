@@ -1,0 +1,161 @@
+openapi: 3.2.0
+info:
+  title: Minds Public Study Runs API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: Study Runs
+paths:
+  /api/v1/studies/{studyId}/runs:
+    get:
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Most recent durable study runs.
+      operationId: listStudyRuns
+      summary: List durable study runs
+      tags:
+      - Study Runs
+      security:
+      - ApiKeyAuth: []
+    post:
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Research planning is required; no run was accepted.
+        '202':
+          description: Run accepted durably.
+        '400':
+          description: Invalid study, question, or idempotency key.
+        '401':
+          description: Missing or invalid API key.
+        '403':
+          description: Caller cannot use the study or has reached a plan limit.
+        '404':
+          description: Study not found.
+        '409':
+          description: Idempotency key reused with different input, or a Mind in an attached Audience has not finished training (code `PANEL_MINDS_NOT_READY`, with `data.notReady` naming them). Retry once training completes.
+      operationId: createStudyRun
+      summary: Create a durable study run
+      description: Atomically accepts a study question and returns a durable run that can be polled, replayed, or cancelled independently of the request connection.
+      tags:
+      - Study Runs
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - question
+              properties:
+                question:
+                  type: string
+                  minLength: 1
+                clientRequestId:
+                  type: string
+                  format: uuid
+                  description: Stable idempotency key for safe retries.
+                audienceIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Optional subset of attached Audiences. Defaults to all Audiences in the Study.
+                attachments:
+                  type: array
+                  items:
+                    type: object
+                links:
+                  type: array
+                  items:
+                    type: object
+                keywords:
+                  type: array
+                  items:
+                    type: object
+                sourcePolicy:
+                  type: string
+                  enum:
+                  - auto
+                  - knowledge_only
+                  default: auto
+                modelConnection:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - id
+                  - revision
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    revision:
+                      type: integer
+                      minimum: 1
+                  description: Verified connection belonging to the caller team, pinned to its current revision. Mutually exclusive with model/provider. Requires the model-connections feature and team entitlement. Applies to Mind responses and verbatim rendering; supporting research analysis retains platform models.
+                model:
+                  type: string
+                  description: Optional per-request model override. Must be sent together with `provider`.
+                provider:
+                  type: string
+                  enum:
+                  - openai
+                  - anthropic
+                  - google
+                  description: Provider for the model override. Must be sent together with `model`.
+                historyMode:
+                  type: string
+                  enum:
+                  - last5
+                  - followup_only
+                  - none
+                  default: none
+                  description: How much of each Mind's own prior answers this run carries. none (default) treats every question as an independent measurement and lets the run process questions in parallel. last5 gives each Mind its own five most recent answers, which costs roughly 2.4x wall-clock and buys ~0.6pp of accuracy. followup_only carries history for conversational turns but not questionnaire items.
+                responseForm:
+                  type: string
+                  enum:
+                  - concise
+                  - standard
+                  - expanded
+                  description: 'How long and how shaped each answer should be, for qualitative questions: `concise` one short message (5-20 words), `standard` 1-3 sentences (25-90 words), `expanded` 2-5 sentences (70-180 words). Omit to let the question decide, which is the existing behaviour. An authored form outranks the phrasing of the question, so a fixed instrument keeps its exact wording. Ignored for scale, categorical and multiselect questions.'
+                routeResearchBrief:
+                  type: boolean
+                  default: false
+                  description: When true, a broad or generated research objective returns a reviewable planning_required response instead of being submitted verbatim to every respondent.
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'
