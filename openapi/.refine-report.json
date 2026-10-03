@@ -1,7 +1,7 @@
 {
   "provider": "getminds",
   "sources": [
-    "getminds-openapi.json"
+    "_original/getminds-openapi.json"
   ],
   "outputs": [
     "getminds-api-keys-api-openapi.yml",
@@ -19,12 +19,11 @@
     "getminds-study-runs-api-openapi.yml",
     "getminds-study-templates-api-openapi.yml"
   ],
-  "archived": [
-    "archived openapi/getminds-openapi.json"
-  ],
+  "archived": [],
   "errors": [],
   "warnings": [],
   "notes": [
+    "sourced from openapi/_original/ (1 archived document(s)); previously refined output at the top level was skipped rather than re-split",
     "getminds-openapi.json: upgraded openapi 3.1.0 -> OpenAPI 3.2.0",
     "getminds-openapi.json: declared missing tag: API Keys",
     "getminds-openapi.json: declared missing tag: Agent Runs",
@@ -40,7 +39,22 @@
     "getminds-openapi.json: declared missing tag: Study Drafts",
     "getminds-openapi.json: declared missing tag: Study Runs",
     "getminds-openapi.json: declared missing tag: Study Templates",
-    "apis.yml register: written (+14 apis, 15 total)"
+    "apis.yml register: already-registered"
   ],
-  "skipped": []
+  "skipped": [
+    "getminds-agent-runs-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-api-keys-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-audiences-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-auth-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-chat-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-knowledge-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-meta-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-minds-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-models-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-research-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-studies-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-study-drafts-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-study-runs-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "getminds-study-templates-api-openapi.yml: previously refined output, superseded by openapi/_original/"
+  ]
 }

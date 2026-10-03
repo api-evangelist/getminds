@@ -119,29 +119,6 @@ paths:
                 value: {}
 components:
   schemas:
-    ApiKeyCreated:
-      type: object
-      required:
-      - id
-      - name
-      - createdAt
-      - key
-      properties:
-        id:
-          type: string
-          description: API key ID (cuid). Use it with `DELETE /v1/api-keys/{keyId}`.
-        name:
-          type:
-          - string
-          - 'null'
-          description: Label as stored (trimmed), or null.
-        createdAt:
-          type: string
-          format: date-time
-        key:
-          type: string
-          pattern: ^minds_[0-9a-f]{48}$
-          description: 'Raw secret, `minds_` followed by 48 hex characters. Send it as `Authorization: Bearer <key>`. Shown only once.'
     ApiKeySummary:
       type: object
       required:
@@ -167,6 +144,29 @@ components:
           - 'null'
           format: date-time
           description: Last time the key authenticated a request; null if never used.
+    ApiKeyCreated:
+      type: object
+      required:
+      - id
+      - name
+      - createdAt
+      - key
+      properties:
+        id:
+          type: string
+          description: API key ID (cuid). Use it with `DELETE /v1/api-keys/{keyId}`.
+        name:
+          type:
+          - string
+          - 'null'
+          description: Label as stored (trimmed), or null.
+        createdAt:
+          type: string
+          format: date-time
+        key:
+          type: string
+          pattern: ^minds_[0-9a-f]{48}$
+          description: 'Raw secret, `minds_` followed by 48 hex characters. Send it as `Authorization: Bearer <key>`. Shown only once.'
   securitySchemes:
     ApiKeyAuth:
       type: http

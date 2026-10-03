@@ -234,6 +234,149 @@ paths:
               $ref: '#/components/schemas/StudyTemplateCreateInput'
 components:
   schemas:
+    StudyDraftPayload:
+      type: object
+      required:
+      - version
+      - state
+      additionalProperties: true
+      properties:
+        version:
+          type: integer
+          enum:
+          - 1
+        state:
+          type: object
+          additionalProperties: true
+    StudyTemplateCreateInput:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - configuration
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          description: Reuse only for retries of the same save.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        configuration:
+          $ref: '#/components/schemas/StudyTemplateConfiguration'
+    StudyTemplateQuestionResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - qualitative
+          - categorical
+          - multiselect
+          - scale
+        scaleRange:
+          type: array
+          items:
+            type: number
+          minItems: 2
+          maxItems: 2
+        categoricalOptions:
+          type: array
+          items:
+            type: string
+        maxSelections:
+          type: integer
+          minimum: 1
+    StudyTemplateConfiguration:
+      type: object
+      additionalProperties: false
+      required:
+      - version
+      - goal
+      - studyLocale
+      - questions
+      - methodId
+      properties:
+        version:
+          type: integer
+          enum:
+          - 1
+        goal:
+          type: string
+          enum:
+          - concept
+          - comparison
+          - website
+          - pricing
+          - market
+          - explore
+        studyLocale:
+          type: string
+          enum:
+          - ar
+          - de
+          - en
+          - es
+          - fr
+          - ja
+          - ko
+          - tr
+          - zh
+        methodId:
+          type: string
+          description: A registered research method that is currently available. Methods that design their own tasks at execution (Van Westendorp, MaxDiff, Kano, NPS, …) keep only the qualitative questions in `questions`.
+        questions:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - text
+            - response
+            properties:
+              text:
+                type: string
+              response:
+                $ref: '#/components/schemas/StudyTemplateQuestionResponse'
+              attachments:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StudyTemplateAsset'
+                default: []
+    StudyTemplateAsset:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - url
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+        path:
+          type: string
+        mimeType:
+          type: string
+        kind:
+          type: string
+          enum:
+          - link
+        sizeBytes:
+          type: number
+          minimum: 0
+        mediaType:
+          type: string
+          enum:
+          - video
     StudyTemplate:
       type: object
       required:
@@ -271,35 +414,45 @@ components:
         updatedAt:
           type: string
           format: date-time
-    StudyTemplateAsset:
+    StudyTemplateUseInput:
       type: object
       additionalProperties: false
       required:
-      - id
-      - name
-      - url
+      - expectedRevision
+      - requestId
       properties:
-        id:
+        expectedRevision:
+          type: integer
+          minimum: 1
+        requestId:
           type: string
+          format: uuid
+          description: Unique per intended draft; reuse only for retries.
+    StudyTemplateUpdateInput:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedRevision
+      anyOf:
+      - required:
+        - name
+      - required:
+        - configuration
+      - required:
+        - isSharedWithTeam
+      properties:
         name:
           type: string
-        url:
-          type: string
-        path:
-          type: string
-        mimeType:
-          type: string
-        kind:
-          type: string
-          enum:
-          - link
-        sizeBytes:
-          type: number
-          minimum: 0
-        mediaType:
-          type: string
-          enum:
-          - video
+          minLength: 1
+          maxLength: 200
+        configuration:
+          $ref: '#/components/schemas/StudyTemplateConfiguration'
+        expectedRevision:
+          type: integer
+          minimum: 1
+        isSharedWithTeam:
+          type: boolean
+          description: Owner only. Share with the authenticated owner’s current team, or turn sharing off.
     StudyDraft:
       type: object
       required:
@@ -364,159 +517,6 @@ components:
         updatedAt:
           type: string
           format: date-time
-    StudyTemplateCreateInput:
-      type: object
-      additionalProperties: false
-      required:
-      - name
-      - configuration
-      properties:
-        requestId:
-          type: string
-          format: uuid
-          description: Reuse only for retries of the same save.
-        name:
-          type: string
-          minLength: 1
-          maxLength: 200
-        configuration:
-          $ref: '#/components/schemas/StudyTemplateConfiguration'
-    StudyTemplateUpdateInput:
-      type: object
-      additionalProperties: false
-      required:
-      - expectedRevision
-      anyOf:
-      - required:
-        - name
-      - required:
-        - configuration
-      - required:
-        - isSharedWithTeam
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 200
-        configuration:
-          $ref: '#/components/schemas/StudyTemplateConfiguration'
-        expectedRevision:
-          type: integer
-          minimum: 1
-        isSharedWithTeam:
-          type: boolean
-          description: Owner only. Share with the authenticated owner’s current team, or turn sharing off.
-    StudyTemplateConfiguration:
-      type: object
-      additionalProperties: false
-      required:
-      - version
-      - goal
-      - studyLocale
-      - questions
-      - methodId
-      properties:
-        version:
-          type: integer
-          enum:
-          - 1
-        goal:
-          type: string
-          enum:
-          - concept
-          - comparison
-          - website
-          - pricing
-          - market
-          - explore
-        studyLocale:
-          type: string
-          enum:
-          - ar
-          - de
-          - en
-          - es
-          - fr
-          - ja
-          - ko
-          - tr
-          - zh
-        methodId:
-          type: string
-          description: A registered research method that is currently available. Methods that design their own tasks at execution (Van Westendorp, MaxDiff, Kano, NPS, …) keep only the qualitative questions in `questions`.
-        questions:
-          type: array
-          minItems: 1
-          items:
-            type: object
-            additionalProperties: false
-            required:
-            - text
-            - response
-            properties:
-              text:
-                type: string
-              response:
-                $ref: '#/components/schemas/StudyTemplateQuestionResponse'
-              attachments:
-                type: array
-                items:
-                  $ref: '#/components/schemas/StudyTemplateAsset'
-                default: []
-    StudyDraftPayload:
-      type: object
-      required:
-      - version
-      - state
-      additionalProperties: true
-      properties:
-        version:
-          type: integer
-          enum:
-          - 1
-        state:
-          type: object
-          additionalProperties: true
-    StudyTemplateQuestionResponse:
-      type: object
-      additionalProperties: false
-      required:
-      - type
-      properties:
-        type:
-          type: string
-          enum:
-          - qualitative
-          - categorical
-          - multiselect
-          - scale
-        scaleRange:
-          type: array
-          items:
-            type: number
-          minItems: 2
-          maxItems: 2
-        categoricalOptions:
-          type: array
-          items:
-            type: string
-        maxSelections:
-          type: integer
-          minimum: 1
-    StudyTemplateUseInput:
-      type: object
-      additionalProperties: false
-      required:
-      - expectedRevision
-      - requestId
-      properties:
-        expectedRevision:
-          type: integer
-          minimum: 1
-        requestId:
-          type: string
-          format: uuid
-          description: Unique per intended draft; reuse only for retries.
   securitySchemes:
     ApiKeyAuth:
       type: http

@@ -1031,6 +1031,59 @@ paths:
       - ApiKeyAuth: []
 components:
   schemas:
+    TrainingStatus:
+      type: object
+      required:
+      - status
+      - readyToChat
+      properties:
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - completed
+          - failed
+          description: Training lifecycle state.
+        readyToChat:
+          type: boolean
+          description: True only when training has completed and the mind can answer.
+        message:
+          type:
+          - string
+          - 'null'
+          description: Human-readable progress / status message.
+        startedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: When training started (null until running).
+        completedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: When training finished (completed or failed).
+        error:
+          type:
+          - object
+          - 'null'
+          description: Present only when status is `failed`.
+          required:
+          - code
+          - retryable
+          properties:
+            code:
+              type: string
+              enum:
+              - COLLECTION_FAILED
+              - PROFILE_GEN_FAILED
+              - TIMEOUT
+              - INTERNAL
+            retryable:
+              type: boolean
+              description: When true, POST /v1/minds/{id}/retrain may recover the mind.
     MindExportStatusResponse:
       type: object
       required:
@@ -1092,6 +1145,265 @@ components:
             contentBase64:
               type: string
               description: Inline base64 file bytes; present for completed `pdf` / `docx` / `pptx` exports unless `metadata=1`.
+    MindSummary:
+      type: object
+      required:
+      - id
+      - name
+      - description
+      - type
+      - tags
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Mind ID.
+        name:
+          type: string
+          description: Mind display name.
+        description:
+          type: string
+          description: Short summary of the Mind.
+        type:
+          type: string
+          enum:
+          - creative
+          - expert
+          - user
+          description: Mind archetype.
+        discipline:
+          type:
+          - string
+          - 'null'
+          description: Area of expertise / domain.
+        sourcePolicy:
+          type: string
+          enum:
+          - auto
+          - knowledge_only
+          description: Persisted source policy for this Mind.
+        tags:
+          type: array
+          items:
+            type: string
+          description: User-supplied tags (max 20).
+        profileImageUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: Avatar image; resolved to an absolute URL.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    MindPattern:
+      type: object
+      required:
+      - id
+      - aspect
+      - subAspect
+      - mind
+      properties:
+        id:
+          type: integer
+          description: Pattern row ID.
+        aspect:
+          type: string
+          description: Detected method / aspect (legacy name for the `method` column).
+        subAspect:
+          type:
+          - string
+          - 'null'
+          description: Detected competency / sub-aspect (legacy name for the `competency` column).
+        mind:
+          type: string
+          description: The supporting quote or insight text for this pattern.
+        mindId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Owning Mind. Full rows only.
+        userId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: User who owned the source material. Full rows only.
+        messageId:
+          type:
+          - string
+          - 'null'
+          description: Chat message the pattern was extracted from, if any. Full rows only.
+        portfolioItemId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Knowledge item the pattern was extracted from, if any. Full rows only.
+        isPredefined:
+          type: boolean
+          description: Full rows only.
+        isPredefinedAspect:
+          type: boolean
+          description: Whether `aspect` comes from a predefined framework. Full rows only.
+        isPredefinedSubAspect:
+          type: boolean
+          description: Whether `subAspect` comes from a predefined framework. Full rows only.
+        createdAt:
+          type: string
+          format: date-time
+          description: Full rows only.
+    Pagination:
+      type: object
+      required:
+      - total
+      - limit
+      - offset
+      properties:
+        total:
+          type: integer
+          description: Total matching rows.
+        limit:
+          type: integer
+          description: Page size requested.
+        offset:
+          type: integer
+          description: Number of rows skipped.
+    CreateMindRequest:
+      type: object
+      required:
+      - name
+      - discipline
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Mind display name.
+        discipline:
+          type: string
+          description: Area of expertise (e.g. "Marketing", "Engineering").
+        description:
+          type: string
+          description: Short summary. Defaults to "Created via API".
+        mode:
+          type: string
+          enum:
+          - keywords
+          - clone
+          - link
+          - manual
+          default: keywords
+          description: Training mode.
+        type:
+          type: string
+          enum:
+          - creative
+          - expert
+          - user
+          default: expert
+        keywords:
+          type: array
+          items:
+            type: string
+          description: Required when `mode=keywords`.
+        personaContext:
+          type: string
+          description: Required when `mode=clone` (name + brief context of the person to emulate).
+        contextLink:
+          type: string
+          format: uri
+          description: Required when `mode=link` (URL the AI will scrape).
+        link:
+          type: string
+          format: uri
+          description: Deprecated alias for `contextLink`.
+        tags:
+          type: array
+          items:
+            type: string
+          maxItems: 20
+        profileImageUrl:
+          type: string
+          format: uri
+          description: External avatar URL; downloaded and persisted to Supabase storage.
+        generateImage:
+          type: boolean
+          description: Trigger async AI profile-image generation after creation. Defaults to true for auto-training modes; pass false to opt out.
+        includeWebSearch:
+          type: boolean
+          default: true
+          description: Set false to skip automatic web research. For a strictly private source-only Mind, use mode=manual, upload knowledge, then regenerate the prompt.
+        isRealPerson:
+          type: boolean
+          description: 'Whether the Mind emulates a real, named person. Defaults to true for mode=clone and false otherwise. Synthetic Minds (false) get name-blind persona prompts: the name is a label, never the seed of the biography.'
+        sourcePolicy:
+          type: string
+          enum:
+          - auto
+          - knowledge_only
+          default: auto
+          description: Persisted source policy. knowledge_only always retrieves processed Mind knowledge and fails closed when it cannot support the answer.
+        isLinkSharingEnabled:
+          type: boolean
+          description: Enable link sharing; generates a `publicShareId`.
+        locale:
+          type: string
+          description: ISO 639-1 code for the auto-generated description language. Falls back to the user's preferredLanguage, then `en`.
+    UpdateMindRequest:
+      type: object
+      description: All fields are optional, but at least one must be present. Fields of the wrong type are ignored rather than rejected.
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Display name (trimmed; 2-100 characters after trimming).
+        description:
+          type: string
+          description: Short summary of the Mind (trimmed).
+        type:
+          type: string
+          enum:
+          - creative
+          - expert
+          - user
+          description: Mind archetype. Case-insensitive; aliases `artist` -> creative and `client` / `consumer` -> user; any other value becomes `creative`.
+        discipline:
+          type: string
+          description: Area of expertise. An empty string clears it (stored as null).
+        systemPrompt:
+          type: string
+          description: Replace the full system prompt verbatim (not trimmed). Use `POST /v1/minds/{mindId}/regenerate-prompt` to rebuild it from the knowledge base instead.
+        sourcePolicy:
+          type: string
+          enum:
+          - auto
+          - knowledge_only
+          description: Persisted answer policy. `knowledge_only` always retrieves processed Mind knowledge and fails closed when it cannot support the answer; a request-level setting can never downgrade it. Empty string or null resets to `auto`.
+        tags:
+          type: array
+          items:
+            type: string
+          maxItems: 20
+          description: Replaces the tag list. Entries are trimmed, non-string and empty entries are dropped, and only the first 20 are kept.
+        isPublic:
+          type: boolean
+          deprecated: true
+          description: Accepted for backward compatibility but always stored as false. Individual Minds cannot be made public; share an Audience instead.
+        isLinkSharingEnabled:
+          type: boolean
+          description: true keeps or generates a `publicShareId` so the Mind is readable via its share link; false clears it.
+        profileImageUrl:
+          type: string
+          format: uri
+          description: Avatar URL stored as given (not downloaded or re-hosted). An empty string clears the image.
     MindDetail:
       type: object
       required:
@@ -1185,318 +1497,6 @@ components:
         updatedAt:
           type: string
           format: date-time
-    CreateMindRequest:
-      type: object
-      required:
-      - name
-      - discipline
-      properties:
-        name:
-          type: string
-          minLength: 2
-          maxLength: 100
-          description: Mind display name.
-        discipline:
-          type: string
-          description: Area of expertise (e.g. "Marketing", "Engineering").
-        description:
-          type: string
-          description: Short summary. Defaults to "Created via API".
-        mode:
-          type: string
-          enum:
-          - keywords
-          - clone
-          - link
-          - manual
-          default: keywords
-          description: Training mode.
-        type:
-          type: string
-          enum:
-          - creative
-          - expert
-          - user
-          default: expert
-        keywords:
-          type: array
-          items:
-            type: string
-          description: Required when `mode=keywords`.
-        personaContext:
-          type: string
-          description: Required when `mode=clone` (name + brief context of the person to emulate).
-        contextLink:
-          type: string
-          format: uri
-          description: Required when `mode=link` (URL the AI will scrape).
-        link:
-          type: string
-          format: uri
-          description: Deprecated alias for `contextLink`.
-        tags:
-          type: array
-          items:
-            type: string
-          maxItems: 20
-        profileImageUrl:
-          type: string
-          format: uri
-          description: External avatar URL; downloaded and persisted to Supabase storage.
-        generateImage:
-          type: boolean
-          description: Trigger async AI profile-image generation after creation. Defaults to true for auto-training modes; pass false to opt out.
-        includeWebSearch:
-          type: boolean
-          default: true
-          description: Set false to skip automatic web research. For a strictly private source-only Mind, use mode=manual, upload knowledge, then regenerate the prompt.
-        isRealPerson:
-          type: boolean
-          description: 'Whether the Mind emulates a real, named person. Defaults to true for mode=clone and false otherwise. Synthetic Minds (false) get name-blind persona prompts: the name is a label, never the seed of the biography.'
-        sourcePolicy:
-          type: string
-          enum:
-          - auto
-          - knowledge_only
-          default: auto
-          description: Persisted source policy. knowledge_only always retrieves processed Mind knowledge and fails closed when it cannot support the answer.
-        isLinkSharingEnabled:
-          type: boolean
-          description: Enable link sharing; generates a `publicShareId`.
-        locale:
-          type: string
-          description: ISO 639-1 code for the auto-generated description language. Falls back to the user's preferredLanguage, then `en`.
-    MindPattern:
-      type: object
-      required:
-      - id
-      - aspect
-      - subAspect
-      - mind
-      properties:
-        id:
-          type: integer
-          description: Pattern row ID.
-        aspect:
-          type: string
-          description: Detected method / aspect (legacy name for the `method` column).
-        subAspect:
-          type:
-          - string
-          - 'null'
-          description: Detected competency / sub-aspect (legacy name for the `competency` column).
-        mind:
-          type: string
-          description: The supporting quote or insight text for this pattern.
-        mindId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-          description: Owning Mind. Full rows only.
-        userId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-          description: User who owned the source material. Full rows only.
-        messageId:
-          type:
-          - string
-          - 'null'
-          description: Chat message the pattern was extracted from, if any. Full rows only.
-        portfolioItemId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-          description: Knowledge item the pattern was extracted from, if any. Full rows only.
-        isPredefined:
-          type: boolean
-          description: Full rows only.
-        isPredefinedAspect:
-          type: boolean
-          description: Whether `aspect` comes from a predefined framework. Full rows only.
-        isPredefinedSubAspect:
-          type: boolean
-          description: Whether `subAspect` comes from a predefined framework. Full rows only.
-        createdAt:
-          type: string
-          format: date-time
-          description: Full rows only.
-    TrainingStatus:
-      type: object
-      required:
-      - status
-      - readyToChat
-      properties:
-        status:
-          type: string
-          enum:
-          - queued
-          - running
-          - completed
-          - failed
-          description: Training lifecycle state.
-        readyToChat:
-          type: boolean
-          description: True only when training has completed and the mind can answer.
-        message:
-          type:
-          - string
-          - 'null'
-          description: Human-readable progress / status message.
-        startedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          description: When training started (null until running).
-        completedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          description: When training finished (completed or failed).
-        error:
-          type:
-          - object
-          - 'null'
-          description: Present only when status is `failed`.
-          required:
-          - code
-          - retryable
-          properties:
-            code:
-              type: string
-              enum:
-              - COLLECTION_FAILED
-              - PROFILE_GEN_FAILED
-              - TIMEOUT
-              - INTERNAL
-            retryable:
-              type: boolean
-              description: When true, POST /v1/minds/{id}/retrain may recover the mind.
-    UpdateMindRequest:
-      type: object
-      description: All fields are optional, but at least one must be present. Fields of the wrong type are ignored rather than rejected.
-      properties:
-        name:
-          type: string
-          minLength: 2
-          maxLength: 100
-          description: Display name (trimmed; 2-100 characters after trimming).
-        description:
-          type: string
-          description: Short summary of the Mind (trimmed).
-        type:
-          type: string
-          enum:
-          - creative
-          - expert
-          - user
-          description: Mind archetype. Case-insensitive; aliases `artist` -> creative and `client` / `consumer` -> user; any other value becomes `creative`.
-        discipline:
-          type: string
-          description: Area of expertise. An empty string clears it (stored as null).
-        systemPrompt:
-          type: string
-          description: Replace the full system prompt verbatim (not trimmed). Use `POST /v1/minds/{mindId}/regenerate-prompt` to rebuild it from the knowledge base instead.
-        sourcePolicy:
-          type: string
-          enum:
-          - auto
-          - knowledge_only
-          description: Persisted answer policy. `knowledge_only` always retrieves processed Mind knowledge and fails closed when it cannot support the answer; a request-level setting can never downgrade it. Empty string or null resets to `auto`.
-        tags:
-          type: array
-          items:
-            type: string
-          maxItems: 20
-          description: Replaces the tag list. Entries are trimmed, non-string and empty entries are dropped, and only the first 20 are kept.
-        isPublic:
-          type: boolean
-          deprecated: true
-          description: Accepted for backward compatibility but always stored as false. Individual Minds cannot be made public; share an Audience instead.
-        isLinkSharingEnabled:
-          type: boolean
-          description: true keeps or generates a `publicShareId` so the Mind is readable via its share link; false clears it.
-        profileImageUrl:
-          type: string
-          format: uri
-          description: Avatar URL stored as given (not downloaded or re-hosted). An empty string clears the image.
-    MindSummary:
-      type: object
-      required:
-      - id
-      - name
-      - description
-      - type
-      - tags
-      - createdAt
-      - updatedAt
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Mind ID.
-        name:
-          type: string
-          description: Mind display name.
-        description:
-          type: string
-          description: Short summary of the Mind.
-        type:
-          type: string
-          enum:
-          - creative
-          - expert
-          - user
-          description: Mind archetype.
-        discipline:
-          type:
-          - string
-          - 'null'
-          description: Area of expertise / domain.
-        sourcePolicy:
-          type: string
-          enum:
-          - auto
-          - knowledge_only
-          description: Persisted source policy for this Mind.
-        tags:
-          type: array
-          items:
-            type: string
-          description: User-supplied tags (max 20).
-        profileImageUrl:
-          type:
-          - string
-          - 'null'
-          format: uri
-          description: Avatar image; resolved to an absolute URL.
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-    Pagination:
-      type: object
-      required:
-      - total
-      - limit
-      - offset
-      properties:
-        total:
-          type: integer
-          description: Total matching rows.
-        limit:
-          type: integer
-          description: Page size requested.
-        offset:
-          type: integer
-          description: Number of rows skipped.
   securitySchemes:
     ApiKeyAuth:
       type: http

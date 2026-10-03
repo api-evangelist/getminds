@@ -240,6 +240,25 @@ components:
         state:
           type: object
           additionalProperties: true
+    StudyDraftCreateInput:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        mode:
+          type: string
+          enum:
+          - quick
+          - custom
+        currentStep:
+          type: string
+        payload:
+          $ref: '#/components/schemas/StudyDraftPayload'
+        idempotencyKey:
+          type: string
     StudyDraft:
       type: object
       required:
@@ -304,25 +323,6 @@ components:
         updatedAt:
           type: string
           format: date-time
-    StudyDraftCreateInput:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        mode:
-          type: string
-          enum:
-          - quick
-          - custom
-        currentStep:
-          type: string
-        payload:
-          $ref: '#/components/schemas/StudyDraftPayload'
-        idempotencyKey:
-          type: string
   securitySchemes:
     ApiKeyAuth:
       type: http

@@ -535,31 +535,6 @@ paths:
       - ApiKeyAuth: []
 components:
   schemas:
-    KnowledgePatternSubAspect:
-      type: object
-      required:
-      - id
-      - name
-      - description
-      - occurrences
-      - evidence
-      properties:
-        id:
-          type: string
-          description: Framework sub-aspect ID, or `(none)` for patterns filed directly under the aspect.
-        name:
-          type: string
-          description: Sub-aspect name, or `(General)` for patterns without a sub-aspect.
-        description:
-          type: string
-          description: Framework definition; empty string when unknown.
-        occurrences:
-          type: integer
-          description: Number of patterns matched to this sub-aspect.
-        evidence:
-          type: array
-          items:
-            $ref: '#/components/schemas/KnowledgePatternEvidence'
     AddKnowledgeRemoteFileRequest:
       type: object
       title: Remote or workspace file
@@ -657,74 +632,6 @@ components:
           type: boolean
           default: false
           description: Regenerate the Mind system prompt once ingestion succeeds.
-    KnowledgeEnrichmentAccepted:
-      type: object
-      title: Keyword enrichment accepted
-      required:
-      - mindId
-      - keywords
-      - queued
-      - regeneratePrompt
-      - message
-      properties:
-        mindId:
-          type: string
-          format: uuid
-        keywords:
-          type: array
-          items:
-            type: string
-          description: Normalised keywords actually queued (trimmed, de-duplicated, max 15).
-        queued:
-          type: boolean
-          const: true
-        regeneratePrompt:
-          type: boolean
-        message:
-          type: string
-          example: Knowledge enrichment queued with 2 keyword(s). Web search and content processing will run in background.
-    KnowledgePatternEvidence:
-      type: object
-      required:
-      - mind
-      properties:
-        mind:
-          type: string
-          description: The extracted pattern text (citation/quote) supporting this sub-aspect.
-        portfolioItemId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-          description: Knowledge item the pattern was extracted from. Present only for privileged callers; null for patterns without a source item.
-        createdAt:
-          type: string
-          format: date-time
-          description: When the pattern was extracted. Present only for privileged callers.
-    KnowledgeItemProcessing:
-      type: object
-      description: Durable background-processing state recorded on the item. `status` is the ingestion lifecycle; poll the item `statusUrl` for embedding/pattern counts and the `readyForRetrieval` gate. Workers may add further keys (for example `error` or `promptRegenerated`).
-      required:
-      - status
-      properties:
-        status:
-          type: string
-          enum:
-          - queued
-          - running
-          - completed
-          - failed
-          description: Ingestion lifecycle state.
-        regeneratePrompt:
-          type: boolean
-          description: Whether the Mind system prompt is regenerated once embeddings and patterns finish successfully.
-        error:
-          type: string
-          description: Failure detail when `status` is `failed`, if the worker recorded one.
-        promptRegenerated:
-          type: boolean
-          description: Whether the optional prompt-regeneration step completed. Present only when recorded.
-      additionalProperties: true
     KnowledgeItem:
       type: object
       description: A knowledge source attached to a Mind. Exactly one of `link` or `filePath` is set for user-added items; auto-collected sources can also be link-based.
@@ -769,28 +676,32 @@ components:
         updatedAt:
           type: string
           format: date-time
-    KnowledgePatternFramework:
+    KnowledgeEnrichmentAccepted:
       type: object
+      title: Keyword enrichment accepted
       required:
-      - id
-      - name
-      - totalOccurrences
-      - aspects
+      - mindId
+      - keywords
+      - queued
+      - regeneratePrompt
+      - message
       properties:
-        id:
+        mindId:
           type: string
-          description: Framework ID (e.g. `ocean`, `disc`, `riasec`).
-        name:
-          type: string
-          description: Framework display name (e.g. `Big Five (OCEAN)`).
-        totalOccurrences:
-          type: integer
-          description: Sum of aspect occurrences within this framework.
-        aspects:
+          format: uuid
+        keywords:
           type: array
-          description: Aspects with at least one occurrence, sorted by occurrences descending.
           items:
-            $ref: '#/components/schemas/KnowledgePatternAspect'
+            type: string
+          description: Normalised keywords actually queued (trimmed, de-duplicated, max 15).
+        queued:
+          type: boolean
+          const: true
+        regeneratePrompt:
+          type: boolean
+        message:
+          type: string
+          example: Knowledge enrichment queued with 2 keyword(s). Web search and content processing will run in background.
     KnowledgePatternAspect:
       type: object
       required:
@@ -815,6 +726,95 @@ components:
           description: Sub-aspects with at least one occurrence, sorted by occurrences descending.
           items:
             $ref: '#/components/schemas/KnowledgePatternSubAspect'
+    KnowledgeItemProcessing:
+      type: object
+      description: Durable background-processing state recorded on the item. `status` is the ingestion lifecycle; poll the item `statusUrl` for embedding/pattern counts and the `readyForRetrieval` gate. Workers may add further keys (for example `error` or `promptRegenerated`).
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - completed
+          - failed
+          description: Ingestion lifecycle state.
+        regeneratePrompt:
+          type: boolean
+          description: Whether the Mind system prompt is regenerated once embeddings and patterns finish successfully.
+        error:
+          type: string
+          description: Failure detail when `status` is `failed`, if the worker recorded one.
+        promptRegenerated:
+          type: boolean
+          description: Whether the optional prompt-regeneration step completed. Present only when recorded.
+      additionalProperties: true
+    KnowledgePatternEvidence:
+      type: object
+      required:
+      - mind
+      properties:
+        mind:
+          type: string
+          description: The extracted pattern text (citation/quote) supporting this sub-aspect.
+        portfolioItemId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Knowledge item the pattern was extracted from. Present only for privileged callers; null for patterns without a source item.
+        createdAt:
+          type: string
+          format: date-time
+          description: When the pattern was extracted. Present only for privileged callers.
+    KnowledgePatternFramework:
+      type: object
+      required:
+      - id
+      - name
+      - totalOccurrences
+      - aspects
+      properties:
+        id:
+          type: string
+          description: Framework ID (e.g. `ocean`, `disc`, `riasec`).
+        name:
+          type: string
+          description: Framework display name (e.g. `Big Five (OCEAN)`).
+        totalOccurrences:
+          type: integer
+          description: Sum of aspect occurrences within this framework.
+        aspects:
+          type: array
+          description: Aspects with at least one occurrence, sorted by occurrences descending.
+          items:
+            $ref: '#/components/schemas/KnowledgePatternAspect'
+    KnowledgePatternSubAspect:
+      type: object
+      required:
+      - id
+      - name
+      - description
+      - occurrences
+      - evidence
+      properties:
+        id:
+          type: string
+          description: Framework sub-aspect ID, or `(none)` for patterns filed directly under the aspect.
+        name:
+          type: string
+          description: Sub-aspect name, or `(General)` for patterns without a sub-aspect.
+        description:
+          type: string
+          description: Framework definition; empty string when unknown.
+        occurrences:
+          type: integer
+          description: Number of patterns matched to this sub-aspect.
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgePatternEvidence'
   securitySchemes:
     ApiKeyAuth:
       type: http
