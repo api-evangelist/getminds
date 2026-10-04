@@ -1031,120 +1031,6 @@ paths:
       - ApiKeyAuth: []
 components:
   schemas:
-    TrainingStatus:
-      type: object
-      required:
-      - status
-      - readyToChat
-      properties:
-        status:
-          type: string
-          enum:
-          - queued
-          - running
-          - completed
-          - failed
-          description: Training lifecycle state.
-        readyToChat:
-          type: boolean
-          description: True only when training has completed and the mind can answer.
-        message:
-          type:
-          - string
-          - 'null'
-          description: Human-readable progress / status message.
-        startedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          description: When training started (null until running).
-        completedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          description: When training finished (completed or failed).
-        error:
-          type:
-          - object
-          - 'null'
-          description: Present only when status is `failed`.
-          required:
-          - code
-          - retryable
-          properties:
-            code:
-              type: string
-              enum:
-              - COLLECTION_FAILED
-              - PROFILE_GEN_FAILED
-              - TIMEOUT
-              - INTERNAL
-            retryable:
-              type: boolean
-              description: When true, POST /v1/minds/{id}/retrain may recover the mind.
-    MindExportStatusResponse:
-      type: object
-      required:
-      - data
-      properties:
-        data:
-          type: object
-          required:
-          - status
-          properties:
-            status:
-              type: string
-              enum:
-              - idle
-              - queued
-              - processing
-              - completed
-              - failed
-              description: '`idle` also covers an unknown or mismatched `jobId` (the job does not belong to this Mind, format, and locale).'
-            progress:
-              type: number
-              minimum: 0
-              maximum: 100
-              description: Present for `queued` / `processing`.
-            error:
-              type: string
-              description: Present for `failed`.
-            kind:
-              type: string
-              enum:
-              - persona_profile
-              description: Present for `completed`.
-            format:
-              type: string
-              enum:
-              - pdf
-              - md
-              - docx
-              - pptx
-              description: Present for `completed`.
-            filename:
-              type: string
-              description: Present for `completed`.
-            mimeType:
-              type: string
-              description: 'Present for `completed`: `application/pdf`, `text/markdown;charset=utf-8`, or the docx / pptx OpenXML MIME type.'
-            generatedAt:
-              type:
-              - string
-              - 'null'
-              format: date-time
-              description: Present for `completed`.
-            downloadUrl:
-              type: string
-              description: 'Present for `completed`: relative path to `GET /v1/minds/{mindId}/export-download` for this artifact.'
-            content:
-              type: string
-              description: Inline UTF-8 markdown; present for completed `md` exports unless `metadata=1`.
-            contentBase64:
-              type: string
-              description: Inline base64 file bytes; present for completed `pdf` / `docx` / `pptx` exports unless `metadata=1`.
     MindSummary:
       type: object
       required:
@@ -1201,6 +1087,22 @@ components:
         updatedAt:
           type: string
           format: date-time
+    Pagination:
+      type: object
+      required:
+      - total
+      - limit
+      - offset
+      properties:
+        total:
+          type: integer
+          description: Total matching rows.
+        limit:
+          type: integer
+          description: Page size requested.
+        offset:
+          type: integer
+          description: Number of rows skipped.
     MindPattern:
       type: object
       required:
@@ -1259,22 +1161,54 @@ components:
           type: string
           format: date-time
           description: Full rows only.
-    Pagination:
+    UpdateMindRequest:
       type: object
-      required:
-      - total
-      - limit
-      - offset
+      description: All fields are optional, but at least one must be present. Fields of the wrong type are ignored rather than rejected.
       properties:
-        total:
-          type: integer
-          description: Total matching rows.
-        limit:
-          type: integer
-          description: Page size requested.
-        offset:
-          type: integer
-          description: Number of rows skipped.
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Display name (trimmed; 2-100 characters after trimming).
+        description:
+          type: string
+          description: Short summary of the Mind (trimmed).
+        type:
+          type: string
+          enum:
+          - creative
+          - expert
+          - user
+          description: Mind archetype. Case-insensitive; aliases `artist` -> creative and `client` / `consumer` -> user; any other value becomes `creative`.
+        discipline:
+          type: string
+          description: Area of expertise. An empty string clears it (stored as null).
+        systemPrompt:
+          type: string
+          description: Replace the full system prompt verbatim (not trimmed). Use `POST /v1/minds/{mindId}/regenerate-prompt` to rebuild it from the knowledge base instead.
+        sourcePolicy:
+          type: string
+          enum:
+          - auto
+          - knowledge_only
+          description: Persisted answer policy. `knowledge_only` always retrieves processed Mind knowledge and fails closed when it cannot support the answer; a request-level setting can never downgrade it. Empty string or null resets to `auto`.
+        tags:
+          type: array
+          items:
+            type: string
+          maxItems: 20
+          description: Replaces the tag list. Entries are trimmed, non-string and empty entries are dropped, and only the first 20 are kept.
+        isPublic:
+          type: boolean
+          deprecated: true
+          description: Accepted for backward compatibility but always stored as false. Individual Minds cannot be made public; share an Audience instead.
+        isLinkSharingEnabled:
+          type: boolean
+          description: true keeps or generates a `publicShareId` so the Mind is readable via its share link; false clears it.
+        profileImageUrl:
+          type: string
+          format: uri
+          description: Avatar URL stored as given (not downloaded or re-hosted). An empty string clears the image.
     CreateMindRequest:
       type: object
       required:
@@ -1356,54 +1290,120 @@ components:
         locale:
           type: string
           description: ISO 639-1 code for the auto-generated description language. Falls back to the user's preferredLanguage, then `en`.
-    UpdateMindRequest:
+    MindExportStatusResponse:
       type: object
-      description: All fields are optional, but at least one must be present. Fields of the wrong type are ignored rather than rejected.
+      required:
+      - data
       properties:
-        name:
-          type: string
-          minLength: 2
-          maxLength: 100
-          description: Display name (trimmed; 2-100 characters after trimming).
-        description:
-          type: string
-          description: Short summary of the Mind (trimmed).
-        type:
+        data:
+          type: object
+          required:
+          - status
+          properties:
+            status:
+              type: string
+              enum:
+              - idle
+              - queued
+              - processing
+              - completed
+              - failed
+              description: '`idle` also covers an unknown or mismatched `jobId` (the job does not belong to this Mind, format, and locale).'
+            progress:
+              type: number
+              minimum: 0
+              maximum: 100
+              description: Present for `queued` / `processing`.
+            error:
+              type: string
+              description: Present for `failed`.
+            kind:
+              type: string
+              enum:
+              - persona_profile
+              description: Present for `completed`.
+            format:
+              type: string
+              enum:
+              - pdf
+              - md
+              - docx
+              - pptx
+              description: Present for `completed`.
+            filename:
+              type: string
+              description: Present for `completed`.
+            mimeType:
+              type: string
+              description: 'Present for `completed`: `application/pdf`, `text/markdown;charset=utf-8`, or the docx / pptx OpenXML MIME type.'
+            generatedAt:
+              type:
+              - string
+              - 'null'
+              format: date-time
+              description: Present for `completed`.
+            downloadUrl:
+              type: string
+              description: 'Present for `completed`: relative path to `GET /v1/minds/{mindId}/export-download` for this artifact.'
+            content:
+              type: string
+              description: Inline UTF-8 markdown; present for completed `md` exports unless `metadata=1`.
+            contentBase64:
+              type: string
+              description: Inline base64 file bytes; present for completed `pdf` / `docx` / `pptx` exports unless `metadata=1`.
+    TrainingStatus:
+      type: object
+      required:
+      - status
+      - readyToChat
+      properties:
+        status:
           type: string
           enum:
-          - creative
-          - expert
-          - user
-          description: Mind archetype. Case-insensitive; aliases `artist` -> creative and `client` / `consumer` -> user; any other value becomes `creative`.
-        discipline:
-          type: string
-          description: Area of expertise. An empty string clears it (stored as null).
-        systemPrompt:
-          type: string
-          description: Replace the full system prompt verbatim (not trimmed). Use `POST /v1/minds/{mindId}/regenerate-prompt` to rebuild it from the knowledge base instead.
-        sourcePolicy:
-          type: string
-          enum:
-          - auto
-          - knowledge_only
-          description: Persisted answer policy. `knowledge_only` always retrieves processed Mind knowledge and fails closed when it cannot support the answer; a request-level setting can never downgrade it. Empty string or null resets to `auto`.
-        tags:
-          type: array
-          items:
-            type: string
-          maxItems: 20
-          description: Replaces the tag list. Entries are trimmed, non-string and empty entries are dropped, and only the first 20 are kept.
-        isPublic:
+          - queued
+          - running
+          - completed
+          - failed
+          description: Training lifecycle state.
+        readyToChat:
           type: boolean
-          deprecated: true
-          description: Accepted for backward compatibility but always stored as false. Individual Minds cannot be made public; share an Audience instead.
-        isLinkSharingEnabled:
-          type: boolean
-          description: true keeps or generates a `publicShareId` so the Mind is readable via its share link; false clears it.
-        profileImageUrl:
-          type: string
-          format: uri
-          description: Avatar URL stored as given (not downloaded or re-hosted). An empty string clears the image.
+          description: True only when training has completed and the mind can answer.
+        message:
+          type:
+          - string
+          - 'null'
+          description: Human-readable progress / status message.
+        startedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: When training started (null until running).
+        completedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: When training finished (completed or failed).
+        error:
+          type:
+          - object
+          - 'null'
+          description: Present only when status is `failed`.
+          required:
+          - code
+          - retryable
+          properties:
+            code:
+              type: string
+              enum:
+              - COLLECTION_FAILED
+              - PROFILE_GEN_FAILED
+              - TIMEOUT
+              - INTERNAL
+            retryable:
+              type: boolean
+              description: When true, POST /v1/minds/{id}/retrain may recover the mind.
     MindDetail:
       type: object
       required:

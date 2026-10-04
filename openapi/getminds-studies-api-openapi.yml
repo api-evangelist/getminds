@@ -1280,6 +1280,432 @@ paths:
                   description: Enable public link sharing for the Study and its attached Audiences/Minds.
 components:
   schemas:
+    StudyAudience:
+      type: object
+      required:
+      - id
+      - name
+      - minds
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        minds:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyMind'
+    StudyOutputAudience:
+      type: object
+      required:
+      - audience
+      - value
+      - answers
+      properties:
+        audience:
+          type: string
+          deprecated: true
+          description: Deprecated alias for audience.
+        value:
+          type: string
+        alignmentScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyOutputAnswer'
+    StudyAskClassificationEvent:
+      type: object
+      required:
+      - type
+      - classification
+      properties:
+        type:
+          type: string
+          enum:
+          - classification
+        classification:
+          $ref: '#/components/schemas/StudyQuestionClassification'
+    StudyExportJobResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          type: object
+          required:
+          - kind
+          - format
+          - jobId
+          - status
+          properties:
+            kind:
+              type: string
+              enum:
+              - executive_brief
+              - full_report
+              - raw_data
+            format:
+              type: string
+              enum:
+              - pdf
+              - md
+              - docx
+              - pptx
+              - csv
+              - xls
+              - sav
+            jobId:
+              type: string
+            status:
+              type: string
+              enum:
+              - queued
+    StudyAnswerProvenance:
+      type: object
+      required:
+      - origin
+      - sourcePolicy
+      - retrievalAttempted
+      - retrievalChunksFound
+      - retrievalChunksUsed
+      - evidenceSourceTypes
+      - fallbackStatus
+      - unsupported
+      - sharedEmbeddingReuse
+      - recordedAt
+      - verifier
+      properties:
+        origin:
+          type: string
+          description: Canonical answer origin. `group_grounding` was renamed to `audience_grounding`; it is still listed so a response recorded before the rename validates.
+          enum:
+          - cited_sources
+          - mind_knowledge
+          - mind_personality
+          - request_evidence
+          - audience_grounding
+          - group_grounding
+          - unsupported
+        originLegacy:
+          type: string
+          deprecated: true
+          description: Pre-rename spelling of `origin`, present only when one exists. Switch to `origin`; this field will be removed.
+          enum:
+          - group_grounding
+        sourcePolicy:
+          type: string
+          enum:
+          - auto
+          - knowledge_only
+        retrievalAttempted:
+          type: boolean
+        retrievalChunksFound:
+          type: integer
+          minimum: 0
+        retrievalChunksUsed:
+          type: integer
+          minimum: 0
+        evidenceSourceTypes:
+          type: array
+          items:
+            type: string
+        fallbackStatus:
+          type: string
+          enum:
+          - grounded
+          - persona_profile
+          - uncertainty_required
+        unsupported:
+          type: boolean
+        sharedEmbeddingReuse:
+          type: boolean
+        recordedAt:
+          type: string
+          format: date-time
+        verifier:
+          type: string
+          enum:
+          - study-answer-provenance-v1
+    StudyAskDoneEvent:
+      type: object
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - done
+    StudyMessage:
+      type: object
+      required:
+      - id
+      - role
+      - content
+      - metadata
+      - createdAt
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+        content:
+          type: string
+        metadata: {}
+        createdAt:
+          type: string
+          format: date-time
+    Pagination:
+      type: object
+      required:
+      - total
+      - limit
+      - offset
+      properties:
+        total:
+          type: integer
+          description: Total matching rows.
+        limit:
+          type: integer
+          description: Page size requested.
+        offset:
+          type: integer
+          description: Number of rows skipped.
+    StudyOutputData:
+      type: object
+      required:
+      - title
+      - type
+      - audiences
+      properties:
+        title:
+          type: string
+        type:
+          type: string
+          enum:
+          - scale
+          - categorical
+          - multiselect
+          - qualitative
+        classification:
+          $ref: '#/components/schemas/StudyQuestionClassification'
+        categoryCodebook:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyCategoryCodebookEntry'
+        audiences:
+          type: array
+          deprecated: true
+          description: Deprecated alias for audiences.
+          items:
+            $ref: '#/components/schemas/StudyOutputAudience'
+    StudyExportRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - executive_brief
+          - full_report
+          - raw_data
+          default: full_report
+        format:
+          type: string
+          enum:
+          - pdf
+          - md
+          - docx
+          - pptx
+          - csv
+          - xls
+          - sav
+          default: md
+        length:
+          type: string
+          enum:
+          - short
+          - standard
+          - detailed
+          default: standard
+        force:
+          type: boolean
+          default: false
+        scheduledRunId:
+          type: string
+          format: uuid
+    StudyMind:
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        discipline:
+          type:
+          - string
+          - 'null'
+        profileImageUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+    StudyAskAggregatingEvent:
+      type: object
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - aggregating
+    StudyCitationSource:
+      type: object
+      required:
+      - id
+      - title
+      - sourceType
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        domain:
+          type: string
+        sourceType:
+          type: string
+          enum:
+          - mind_knowledge
+          - web
+        similarity:
+          type: number
+    StudyAskStartEvent:
+      type: object
+      required:
+      - type
+      - total
+      properties:
+        type:
+          type: string
+          enum:
+          - start
+        total:
+          type: integer
+          description: Total number of minds that will answer.
+    StudyContextLink:
+      type: object
+      properties:
+        label:
+          type: string
+          description: URL or display label.
+        url:
+          type: string
+          description: URL to fetch when separate from `label`.
+        id:
+          type: string
+    StudyAskResultEvent:
+      type: object
+      required:
+      - type
+      - outputData
+      - outputType
+      properties:
+        type:
+          type: string
+          enum:
+          - result
+        outputData:
+          $ref: '#/components/schemas/StudyOutputData'
+        outputType:
+          type: string
+          enum:
+          - bar
+    StudyAskRequest:
+      type: object
+      required:
+      - question
+      properties:
+        question:
+          type: string
+          minLength: 1
+          description: Research question to ask the study.
+        sourcePolicy:
+          type: string
+          enum:
+          - auto
+          - knowledge_only
+          default: auto
+          description: knowledge_only forbids live/request sources, requires each Mind's processed knowledge, and fails closed when retrieval is empty.
+        historyMode:
+          type: string
+          enum:
+          - last5
+          - followup_only
+          - none
+          default: none
+          description: How much of each Mind's own prior answers this question carries. Defaults to none. Use last5 when a respondent's coherence across items is the deliverable.
+        audienceIds:
+          type: array
+          description: Optional subset of attached audience UUIDs to ask. Defaults to all audiences on the study.
+          items:
+            type: string
+            format: uuid
+        attachments:
+          type: array
+          description: Files or images to process once and include as context for every Mind in the Study.
+          items:
+            $ref: '#/components/schemas/StudyAttachment'
+        links:
+          type: array
+          description: Web links to fetch and summarize for context.
+          items:
+            $ref: '#/components/schemas/StudyContextLink'
+        keywords:
+          type: array
+          description: Keyword/source pairs to fetch and summarize for context.
+          items:
+            $ref: '#/components/schemas/StudyKeywordContext'
+        model:
+          type: string
+          description: Optional per-request model override. Must be sent together with `provider`.
+        provider:
+          type: string
+          enum:
+          - openai
+          - anthropic
+          - google
+          description: Provider for the model override. Must be sent together with `model`.
+        disableQuestionClassifier:
+          type: boolean
+          default: false
+          description: Skip automatic scale/categorical/multiselect/qualitative classification.
+        responseMode:
+          type: string
+          enum:
+          - stream
+          - queued
+          default: stream
+          description: Use queued to persist the question and return immediately while durable workers generate the answers.
+        responseForm:
+          type: string
+          enum:
+          - concise
+          - standard
+          - expanded
+          description: 'How long and how shaped each answer should be, for qualitative questions: `concise` one short message (5-20 words), `standard` 1-3 sentences (25-90 words), `expanded` 2-5 sentences (70-180 words). Omit to let the question decide, which is the existing behaviour. An authored form outranks the phrasing of the question, so a fixed instrument keeps its exact wording. Ignored for scale, categorical and multiselect questions, which are shaped by their answer space.'
+        clientRequestId:
+          type: string
+          format: uuid
+          description: Optional idempotency key for queued submissions.
     StudyKeywordContext:
       type: object
       properties:
@@ -1291,15 +1717,7 @@ components:
           description: Optional source URL for the keyword.
         id:
           type: string
-    StudyAskSseEvent:
-      oneOf:
-      - $ref: '#/components/schemas/StudyAskStartEvent'
-      - $ref: '#/components/schemas/StudyAskClassificationEvent'
-      - $ref: '#/components/schemas/StudyAskAnswerEvent'
-      - $ref: '#/components/schemas/StudyAskAggregatingEvent'
-      - $ref: '#/components/schemas/StudyAskResultEvent'
-      - $ref: '#/components/schemas/StudyAskDoneEvent'
-    StudyAskDoneEvent:
+    StudyQuestionClassification:
       type: object
       required:
       - type
@@ -1307,7 +1725,30 @@ components:
         type:
           type: string
           enum:
-          - done
+          - scale
+          - categorical
+          - multiselect
+          - qualitative
+        scaleRange:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: number
+        options:
+          type: array
+          items:
+            type: string
+        responseMode:
+          type: string
+          enum:
+          - everyday
+          - standard_qualitative
+          - deliberative_values
+          - scale
+          - categorical
+          - factual_research
+          description: Answer-depth and grounding policy, orthogonal to the structured response type.
     StudyDetail:
       type: object
       required:
@@ -1351,62 +1792,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/StudyMessage'
-    StudyAskAggregatingEvent:
-      type: object
-      required:
-      - type
-      properties:
-        type:
-          type: string
-          enum:
-          - aggregating
-    StudyAttachment:
-      type: object
-      properties:
-        url:
-          type: string
-          description: External URL for the uploaded or remote file.
-        path:
-          type: string
-          description: Storage path for an uploaded file.
-        name:
-          type: string
-        type:
-          type: string
-          description: MIME type when known.
-    StudyAskClassificationEvent:
-      type: object
-      required:
-      - type
-      - classification
-      properties:
-        type:
-          type: string
-          enum:
-          - classification
-        classification:
-          $ref: '#/components/schemas/StudyQuestionClassification'
-    StudyOutputAudience:
-      type: object
-      required:
-      - audience
-      - value
-      - answers
-      properties:
-        audience:
-          type: string
-          deprecated: true
-          description: Deprecated alias for audience.
-        value:
-          type: string
-        alignmentScore:
-          type: integer
-          minimum: 0
-          maximum: 100
-        answers:
-          type: array
-          items:
-            $ref: '#/components/schemas/StudyOutputAnswer'
     StudyOutputAnswer:
       type: object
       required:
@@ -1443,107 +1828,22 @@ components:
           $ref: '#/components/schemas/StudyCitationProvenance'
         answerProvenance:
           $ref: '#/components/schemas/StudyAnswerProvenance'
-    StudyExportJobResponse:
+    StudyCategoryCodebookEntry:
       type: object
       required:
-      - data
+      - label
+      - originalLabels
+      - count
       properties:
-        data:
-          type: object
-          required:
-          - kind
-          - format
-          - jobId
-          - status
-          properties:
-            kind:
-              type: string
-              enum:
-              - executive_brief
-              - full_report
-              - raw_data
-            format:
-              type: string
-              enum:
-              - pdf
-              - md
-              - docx
-              - pptx
-              - csv
-              - xls
-              - sav
-            jobId:
-              type: string
-            status:
-              type: string
-              enum:
-              - queued
-    StudyExportRequest:
-      type: object
-      properties:
-        kind:
+        label:
           type: string
-          enum:
-          - executive_brief
-          - full_report
-          - raw_data
-          default: full_report
-        format:
-          type: string
-          enum:
-          - pdf
-          - md
-          - docx
-          - pptx
-          - csv
-          - xls
-          - sav
-          default: md
-        length:
-          type: string
-          enum:
-          - short
-          - standard
-          - detailed
-          default: standard
-        force:
-          type: boolean
-          default: false
-        scheduledRunId:
-          type: string
-          format: uuid
-    Pagination:
-      type: object
-      required:
-      - total
-      - limit
-      - offset
-      properties:
-        total:
-          type: integer
-          description: Total matching rows.
-        limit:
-          type: integer
-          description: Page size requested.
-        offset:
-          type: integer
-          description: Number of rows skipped.
-    StudyAudience:
-      type: object
-      required:
-      - id
-      - name
-      - minds
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        minds:
+        originalLabels:
           type: array
           items:
-            $ref: '#/components/schemas/StudyMind'
+            type: string
+        count:
+          type: integer
+          minimum: 0
     StudyExportStatusResponse:
       type: object
       required:
@@ -1604,76 +1904,6 @@ components:
               - sav
             sourceVersion:
               type: string
-    StudyOutputData:
-      type: object
-      required:
-      - title
-      - type
-      - audiences
-      properties:
-        title:
-          type: string
-        type:
-          type: string
-          enum:
-          - scale
-          - categorical
-          - multiselect
-          - qualitative
-        classification:
-          $ref: '#/components/schemas/StudyQuestionClassification'
-        categoryCodebook:
-          type: array
-          items:
-            $ref: '#/components/schemas/StudyCategoryCodebookEntry'
-        audiences:
-          type: array
-          deprecated: true
-          description: Deprecated alias for audiences.
-          items:
-            $ref: '#/components/schemas/StudyOutputAudience'
-    StudyMessage:
-      type: object
-      required:
-      - id
-      - role
-      - content
-      - metadata
-      - createdAt
-      properties:
-        id:
-          type: string
-        role:
-          type: string
-        content:
-          type: string
-        metadata: {}
-        createdAt:
-          type: string
-          format: date-time
-    StudyCitationSource:
-      type: object
-      required:
-      - id
-      - title
-      - sourceType
-      properties:
-        id:
-          type: string
-        title:
-          type: string
-        url:
-          type: string
-          format: uri
-        domain:
-          type: string
-        sourceType:
-          type: string
-          enum:
-          - mind_knowledge
-          - web
-        similarity:
-          type: number
     StudySummary:
       type: object
       required:
@@ -1783,260 +2013,28 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/StudyAudience'
-    StudyAskResultEvent:
-      type: object
-      required:
-      - type
-      - outputData
-      - outputType
-      properties:
-        type:
-          type: string
-          enum:
-          - result
-        outputData:
-          $ref: '#/components/schemas/StudyOutputData'
-        outputType:
-          type: string
-          enum:
-          - bar
-    StudyCategoryCodebookEntry:
-      type: object
-      required:
-      - label
-      - originalLabels
-      - count
-      properties:
-        label:
-          type: string
-        originalLabels:
-          type: array
-          items:
-            type: string
-        count:
-          type: integer
-          minimum: 0
-    StudyAskRequest:
-      type: object
-      required:
-      - question
-      properties:
-        question:
-          type: string
-          minLength: 1
-          description: Research question to ask the study.
-        sourcePolicy:
-          type: string
-          enum:
-          - auto
-          - knowledge_only
-          default: auto
-          description: knowledge_only forbids live/request sources, requires each Mind's processed knowledge, and fails closed when retrieval is empty.
-        historyMode:
-          type: string
-          enum:
-          - last5
-          - followup_only
-          - none
-          default: none
-          description: How much of each Mind's own prior answers this question carries. Defaults to none. Use last5 when a respondent's coherence across items is the deliverable.
-        audienceIds:
-          type: array
-          description: Optional subset of attached audience UUIDs to ask. Defaults to all audiences on the study.
-          items:
-            type: string
-            format: uuid
-        attachments:
-          type: array
-          description: Files or images to process once and include as context for every Mind in the Study.
-          items:
-            $ref: '#/components/schemas/StudyAttachment'
-        links:
-          type: array
-          description: Web links to fetch and summarize for context.
-          items:
-            $ref: '#/components/schemas/StudyContextLink'
-        keywords:
-          type: array
-          description: Keyword/source pairs to fetch and summarize for context.
-          items:
-            $ref: '#/components/schemas/StudyKeywordContext'
-        model:
-          type: string
-          description: Optional per-request model override. Must be sent together with `provider`.
-        provider:
-          type: string
-          enum:
-          - openai
-          - anthropic
-          - google
-          description: Provider for the model override. Must be sent together with `model`.
-        disableQuestionClassifier:
-          type: boolean
-          default: false
-          description: Skip automatic scale/categorical/multiselect/qualitative classification.
-        responseMode:
-          type: string
-          enum:
-          - stream
-          - queued
-          default: stream
-          description: Use queued to persist the question and return immediately while durable workers generate the answers.
-        responseForm:
-          type: string
-          enum:
-          - concise
-          - standard
-          - expanded
-          description: 'How long and how shaped each answer should be, for qualitative questions: `concise` one short message (5-20 words), `standard` 1-3 sentences (25-90 words), `expanded` 2-5 sentences (70-180 words). Omit to let the question decide, which is the existing behaviour. An authored form outranks the phrasing of the question, so a fixed instrument keeps its exact wording. Ignored for scale, categorical and multiselect questions, which are shaped by their answer space.'
-        clientRequestId:
-          type: string
-          format: uuid
-          description: Optional idempotency key for queued submissions.
-    StudyAnswerProvenance:
-      type: object
-      required:
-      - origin
-      - sourcePolicy
-      - retrievalAttempted
-      - retrievalChunksFound
-      - retrievalChunksUsed
-      - evidenceSourceTypes
-      - fallbackStatus
-      - unsupported
-      - sharedEmbeddingReuse
-      - recordedAt
-      - verifier
-      properties:
-        origin:
-          type: string
-          description: Canonical answer origin. `group_grounding` was renamed to `audience_grounding`; it is still listed so a response recorded before the rename validates.
-          enum:
-          - cited_sources
-          - mind_knowledge
-          - mind_personality
-          - request_evidence
-          - audience_grounding
-          - group_grounding
-          - unsupported
-        originLegacy:
-          type: string
-          deprecated: true
-          description: Pre-rename spelling of `origin`, present only when one exists. Switch to `origin`; this field will be removed.
-          enum:
-          - group_grounding
-        sourcePolicy:
-          type: string
-          enum:
-          - auto
-          - knowledge_only
-        retrievalAttempted:
-          type: boolean
-        retrievalChunksFound:
-          type: integer
-          minimum: 0
-        retrievalChunksUsed:
-          type: integer
-          minimum: 0
-        evidenceSourceTypes:
-          type: array
-          items:
-            type: string
-        fallbackStatus:
-          type: string
-          enum:
-          - grounded
-          - persona_profile
-          - uncertainty_required
-        unsupported:
-          type: boolean
-        sharedEmbeddingReuse:
-          type: boolean
-        recordedAt:
-          type: string
-          format: date-time
-        verifier:
-          type: string
-          enum:
-          - study-answer-provenance-v1
-    StudyAskStartEvent:
-      type: object
-      required:
-      - type
-      - total
-      properties:
-        type:
-          type: string
-          enum:
-          - start
-        total:
-          type: integer
-          description: Total number of minds that will answer.
-    StudyMind:
-      type: object
-      required:
-      - id
-      - name
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        discipline:
-          type:
-          - string
-          - 'null'
-        profileImageUrl:
-          type:
-          - string
-          - 'null'
-          format: uri
-    StudyContextLink:
+    StudyAskSseEvent:
+      oneOf:
+      - $ref: '#/components/schemas/StudyAskStartEvent'
+      - $ref: '#/components/schemas/StudyAskClassificationEvent'
+      - $ref: '#/components/schemas/StudyAskAnswerEvent'
+      - $ref: '#/components/schemas/StudyAskAggregatingEvent'
+      - $ref: '#/components/schemas/StudyAskResultEvent'
+      - $ref: '#/components/schemas/StudyAskDoneEvent'
+    StudyAttachment:
       type: object
       properties:
-        label:
-          type: string
-          description: URL or display label.
         url:
           type: string
-          description: URL to fetch when separate from `label`.
-        id:
+          description: External URL for the uploaded or remote file.
+        path:
           type: string
-    StudyAskAnswerEvent:
-      type: object
-      required:
-      - type
-      - mindId
-      - mindName
-      - audienceId
-      - audienceName
-      - answer
-      properties:
+          description: Storage path for an uploaded file.
+        name:
+          type: string
         type:
           type: string
-          enum:
-          - answer
-        mindId:
-          type: string
-          format: uuid
-        mindName:
-          type: string
-        discipline:
-          type:
-          - string
-          - 'null'
-        profileImageUrl:
-          type:
-          - string
-          - 'null'
-        audienceId:
-          type: string
-          format: uuid
-        audienceName:
-          type: string
-        answer:
-          type: string
+          description: MIME type when known.
     StudyCitationProvenance:
       type: object
       required:
@@ -2072,38 +2070,40 @@ components:
           - timeout
           - error
           description: 'Only when status is unavailable: why no sources could be attributed.'
-    StudyQuestionClassification:
+    StudyAskAnswerEvent:
       type: object
       required:
       - type
+      - mindId
+      - mindName
+      - audienceId
+      - audienceName
+      - answer
       properties:
         type:
           type: string
           enum:
-          - scale
-          - categorical
-          - multiselect
-          - qualitative
-        scaleRange:
-          type: array
-          minItems: 2
-          maxItems: 2
-          items:
-            type: number
-        options:
-          type: array
-          items:
-            type: string
-        responseMode:
+          - answer
+        mindId:
           type: string
-          enum:
-          - everyday
-          - standard_qualitative
-          - deliberative_values
-          - scale
-          - categorical
-          - factual_research
-          description: Answer-depth and grounding policy, orthogonal to the structured response type.
+          format: uuid
+        mindName:
+          type: string
+        discipline:
+          type:
+          - string
+          - 'null'
+        profileImageUrl:
+          type:
+          - string
+          - 'null'
+        audienceId:
+          type: string
+          format: uuid
+        audienceName:
+          type: string
+        answer:
+          type: string
   securitySchemes:
     ApiKeyAuth:
       type: http

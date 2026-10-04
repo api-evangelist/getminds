@@ -234,6 +234,20 @@ paths:
               $ref: '#/components/schemas/StudyTemplateCreateInput'
 components:
   schemas:
+    StudyTemplateUseInput:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedRevision
+      - requestId
+      properties:
+        expectedRevision:
+          type: integer
+          minimum: 1
+        requestId:
+          type: string
+          format: uuid
+          description: Unique per intended draft; reuse only for retries.
     StudyDraftPayload:
       type: object
       required:
@@ -265,32 +279,43 @@ components:
           maxLength: 200
         configuration:
           $ref: '#/components/schemas/StudyTemplateConfiguration'
-    StudyTemplateQuestionResponse:
+    StudyTemplate:
       type: object
-      additionalProperties: false
       required:
-      - type
+      - id
+      - name
+      - revision
+      - configuration
+      - createdAt
+      - updatedAt
+      - isSharedWithTeam
+      - canManage
+      - canShareWithTeam
       properties:
-        type:
+        id:
           type: string
-          enum:
-          - qualitative
-          - categorical
-          - multiselect
-          - scale
-        scaleRange:
-          type: array
-          items:
-            type: number
-          minItems: 2
-          maxItems: 2
-        categoricalOptions:
-          type: array
-          items:
-            type: string
-        maxSelections:
+          format: uuid
+        name:
+          type: string
+        revision:
           type: integer
           minimum: 1
+        isSharedWithTeam:
+          type: boolean
+        canManage:
+          type: boolean
+          description: Only the owner may update, delete or share this template.
+        canShareWithTeam:
+          type: boolean
+          description: The owner has a team, or can turn off existing sharing.
+        configuration:
+          $ref: '#/components/schemas/StudyTemplateConfiguration'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     StudyTemplateConfiguration:
       type: object
       additionalProperties: false
@@ -348,111 +373,6 @@ components:
                 items:
                   $ref: '#/components/schemas/StudyTemplateAsset'
                 default: []
-    StudyTemplateAsset:
-      type: object
-      additionalProperties: false
-      required:
-      - id
-      - name
-      - url
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        url:
-          type: string
-        path:
-          type: string
-        mimeType:
-          type: string
-        kind:
-          type: string
-          enum:
-          - link
-        sizeBytes:
-          type: number
-          minimum: 0
-        mediaType:
-          type: string
-          enum:
-          - video
-    StudyTemplate:
-      type: object
-      required:
-      - id
-      - name
-      - revision
-      - configuration
-      - createdAt
-      - updatedAt
-      - isSharedWithTeam
-      - canManage
-      - canShareWithTeam
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        revision:
-          type: integer
-          minimum: 1
-        isSharedWithTeam:
-          type: boolean
-        canManage:
-          type: boolean
-          description: Only the owner may update, delete or share this template.
-        canShareWithTeam:
-          type: boolean
-          description: The owner has a team, or can turn off existing sharing.
-        configuration:
-          $ref: '#/components/schemas/StudyTemplateConfiguration'
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-    StudyTemplateUseInput:
-      type: object
-      additionalProperties: false
-      required:
-      - expectedRevision
-      - requestId
-      properties:
-        expectedRevision:
-          type: integer
-          minimum: 1
-        requestId:
-          type: string
-          format: uuid
-          description: Unique per intended draft; reuse only for retries.
-    StudyTemplateUpdateInput:
-      type: object
-      additionalProperties: false
-      required:
-      - expectedRevision
-      anyOf:
-      - required:
-        - name
-      - required:
-        - configuration
-      - required:
-        - isSharedWithTeam
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 200
-        configuration:
-          $ref: '#/components/schemas/StudyTemplateConfiguration'
-        expectedRevision:
-          type: integer
-          minimum: 1
-        isSharedWithTeam:
-          type: boolean
-          description: Owner only. Share with the authenticated owner’s current team, or turn sharing off.
     StudyDraft:
       type: object
       required:
@@ -517,6 +437,86 @@ components:
         updatedAt:
           type: string
           format: date-time
+    StudyTemplateUpdateInput:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedRevision
+      anyOf:
+      - required:
+        - name
+      - required:
+        - configuration
+      - required:
+        - isSharedWithTeam
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        configuration:
+          $ref: '#/components/schemas/StudyTemplateConfiguration'
+        expectedRevision:
+          type: integer
+          minimum: 1
+        isSharedWithTeam:
+          type: boolean
+          description: Owner only. Share with the authenticated owner’s current team, or turn sharing off.
+    StudyTemplateQuestionResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - qualitative
+          - categorical
+          - multiselect
+          - scale
+        scaleRange:
+          type: array
+          items:
+            type: number
+          minItems: 2
+          maxItems: 2
+        categoricalOptions:
+          type: array
+          items:
+            type: string
+        maxSelections:
+          type: integer
+          minimum: 1
+    StudyTemplateAsset:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - url
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+        path:
+          type: string
+        mimeType:
+          type: string
+        kind:
+          type: string
+          enum:
+          - link
+        sizeBytes:
+          type: number
+          minimum: 0
+        mediaType:
+          type: string
+          enum:
+          - video
   securitySchemes:
     ApiKeyAuth:
       type: http

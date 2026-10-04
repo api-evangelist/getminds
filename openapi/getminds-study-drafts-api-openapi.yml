@@ -226,20 +226,6 @@ paths:
               $ref: '#/components/schemas/StudyDraftCreateInput'
 components:
   schemas:
-    StudyDraftPayload:
-      type: object
-      required:
-      - version
-      - state
-      additionalProperties: true
-      properties:
-        version:
-          type: integer
-          enum:
-          - 1
-        state:
-          type: object
-          additionalProperties: true
     StudyDraftCreateInput:
       type: object
       properties:
@@ -323,6 +309,20 @@ components:
         updatedAt:
           type: string
           format: date-time
+    StudyDraftPayload:
+      type: object
+      required:
+      - version
+      - state
+      additionalProperties: true
+      properties:
+        version:
+          type: integer
+          enum:
+          - 1
+        state:
+          type: object
+          additionalProperties: true
   securitySchemes:
     ApiKeyAuth:
       type: http

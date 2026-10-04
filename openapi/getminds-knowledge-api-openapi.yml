@@ -565,73 +565,30 @@ components:
           type: boolean
           default: false
           description: Regenerate the Mind system prompt once ingestion succeeds.
-    KnowledgeItemAccepted:
+    KnowledgePatternAspect:
       type: object
-      title: Knowledge item accepted
-      description: Created item for file and link modes. `filePath` is present for uploads, `link` for URLs; `isWatched`/`updatedAt` are not included here (see the list endpoint).
       required:
       - id
+      - name
       - description
-      - createdAt
-      - processing
-      - statusUrl
+      - occurrences
+      - subAspects
       properties:
         id:
           type: string
-          format: uuid
+          description: Framework aspect ID (e.g. `ocean-O`).
+        name:
+          type: string
         description:
           type: string
-        link:
-          type: string
-          format: uri
-          description: Present for link mode only.
-        filePath:
-          type: string
-          description: 'Present for file modes only: `portfolio/{userId}/{timestamp}_{sanitizedName}`.'
-        createdAt:
-          type: string
-          format: date-time
-        processing:
-          $ref: '#/components/schemas/KnowledgeItemProcessing'
-          description: 'Always `{ status: "queued", regeneratePrompt }` at creation.'
-        statusUrl:
-          type: string
-          description: Relative path of `GET /api/v1/minds/{mindId}/knowledge/{itemId}/status`; poll until `readyForRetrieval` is true.
-    AddKnowledgeKeywordsRequest:
-      type: object
-      title: Keyword web search
-      required:
-      - keywords
-      properties:
-        keywords:
+        occurrences:
+          type: integer
+          description: Number of patterns matched to this aspect (sum of its sub-aspects).
+        subAspects:
           type: array
-          minItems: 1
-          maxItems: 15
+          description: Sub-aspects with at least one occurrence, sorted by occurrences descending.
           items:
-            type: string
-          description: Search topics. Trimmed, de-duplicated, and capped at 15 (extras are silently dropped). Must contain at least one non-empty string.
-        regeneratePrompt:
-          type: boolean
-          default: true
-          description: Regenerate the Mind system prompt after the collected content is processed.
-    AddKnowledgeLinkRequest:
-      type: object
-      title: Link
-      required:
-      - link
-      - description
-      properties:
-        link:
-          type: string
-          format: uri
-          description: URL of a web page, YouTube video, or research paper. Note the field is `link`, not `url`.
-        description:
-          type: string
-          description: Description of the content.
-        regeneratePrompt:
-          type: boolean
-          default: false
-          description: Regenerate the Mind system prompt once ingestion succeeds.
+            $ref: '#/components/schemas/KnowledgePatternSubAspect'
     KnowledgeItem:
       type: object
       description: A knowledge source attached to a Mind. Exactly one of `link` or `filePath` is set for user-added items; auto-collected sources can also be link-based.
@@ -676,56 +633,80 @@ components:
         updatedAt:
           type: string
           format: date-time
-    KnowledgeEnrichmentAccepted:
-      type: object
-      title: Keyword enrichment accepted
-      required:
-      - mindId
-      - keywords
-      - queued
-      - regeneratePrompt
-      - message
-      properties:
-        mindId:
-          type: string
-          format: uuid
-        keywords:
-          type: array
-          items:
-            type: string
-          description: Normalised keywords actually queued (trimmed, de-duplicated, max 15).
-        queued:
-          type: boolean
-          const: true
-        regeneratePrompt:
-          type: boolean
-        message:
-          type: string
-          example: Knowledge enrichment queued with 2 keyword(s). Web search and content processing will run in background.
-    KnowledgePatternAspect:
+    KnowledgePatternSubAspect:
       type: object
       required:
       - id
       - name
       - description
       - occurrences
-      - subAspects
+      - evidence
       properties:
         id:
           type: string
-          description: Framework aspect ID (e.g. `ocean-O`).
+          description: Framework sub-aspect ID, or `(none)` for patterns filed directly under the aspect.
         name:
           type: string
+          description: Sub-aspect name, or `(General)` for patterns without a sub-aspect.
         description:
           type: string
+          description: Framework definition; empty string when unknown.
         occurrences:
           type: integer
-          description: Number of patterns matched to this aspect (sum of its sub-aspects).
-        subAspects:
+          description: Number of patterns matched to this sub-aspect.
+        evidence:
           type: array
-          description: Sub-aspects with at least one occurrence, sorted by occurrences descending.
           items:
-            $ref: '#/components/schemas/KnowledgePatternSubAspect'
+            $ref: '#/components/schemas/KnowledgePatternEvidence'
+    AddKnowledgeKeywordsRequest:
+      type: object
+      title: Keyword web search
+      required:
+      - keywords
+      properties:
+        keywords:
+          type: array
+          minItems: 1
+          maxItems: 15
+          items:
+            type: string
+          description: Search topics. Trimmed, de-duplicated, and capped at 15 (extras are silently dropped). Must contain at least one non-empty string.
+        regeneratePrompt:
+          type: boolean
+          default: true
+          description: Regenerate the Mind system prompt after the collected content is processed.
+    KnowledgeItemAccepted:
+      type: object
+      title: Knowledge item accepted
+      description: Created item for file and link modes. `filePath` is present for uploads, `link` for URLs; `isWatched`/`updatedAt` are not included here (see the list endpoint).
+      required:
+      - id
+      - description
+      - createdAt
+      - processing
+      - statusUrl
+      properties:
+        id:
+          type: string
+          format: uuid
+        description:
+          type: string
+        link:
+          type: string
+          format: uri
+          description: Present for link mode only.
+        filePath:
+          type: string
+          description: 'Present for file modes only: `portfolio/{userId}/{timestamp}_{sanitizedName}`.'
+        createdAt:
+          type: string
+          format: date-time
+        processing:
+          $ref: '#/components/schemas/KnowledgeItemProcessing'
+          description: 'Always `{ status: "queued", regeneratePrompt }` at creation.'
+        statusUrl:
+          type: string
+          description: Relative path of `GET /api/v1/minds/{mindId}/knowledge/{itemId}/status`; poll until `readyForRetrieval` is true.
     KnowledgeItemProcessing:
       type: object
       description: Durable background-processing state recorded on the item. `status` is the ingestion lifecycle; poll the item `statusUrl` for embedding/pattern counts and the `readyForRetrieval` gate. Workers may add further keys (for example `error` or `promptRegenerated`).
@@ -768,6 +749,24 @@ components:
           type: string
           format: date-time
           description: When the pattern was extracted. Present only for privileged callers.
+    AddKnowledgeLinkRequest:
+      type: object
+      title: Link
+      required:
+      - link
+      - description
+      properties:
+        link:
+          type: string
+          format: uri
+          description: URL of a web page, YouTube video, or research paper. Note the field is `link`, not `url`.
+        description:
+          type: string
+          description: Description of the content.
+        regeneratePrompt:
+          type: boolean
+          default: false
+          description: Regenerate the Mind system prompt once ingestion succeeds.
     KnowledgePatternFramework:
       type: object
       required:
@@ -790,31 +789,32 @@ components:
           description: Aspects with at least one occurrence, sorted by occurrences descending.
           items:
             $ref: '#/components/schemas/KnowledgePatternAspect'
-    KnowledgePatternSubAspect:
+    KnowledgeEnrichmentAccepted:
       type: object
+      title: Keyword enrichment accepted
       required:
-      - id
-      - name
-      - description
-      - occurrences
-      - evidence
+      - mindId
+      - keywords
+      - queued
+      - regeneratePrompt
+      - message
       properties:
-        id:
+        mindId:
           type: string
-          description: Framework sub-aspect ID, or `(none)` for patterns filed directly under the aspect.
-        name:
-          type: string
-          description: Sub-aspect name, or `(General)` for patterns without a sub-aspect.
-        description:
-          type: string
-          description: Framework definition; empty string when unknown.
-        occurrences:
-          type: integer
-          description: Number of patterns matched to this sub-aspect.
-        evidence:
+          format: uuid
+        keywords:
           type: array
           items:
-            $ref: '#/components/schemas/KnowledgePatternEvidence'
+            type: string
+          description: Normalised keywords actually queued (trimmed, de-duplicated, max 15).
+        queued:
+          type: boolean
+          const: true
+        regeneratePrompt:
+          type: boolean
+        message:
+          type: string
+          example: Knowledge enrichment queued with 2 keyword(s). Web search and content processing will run in background.
   securitySchemes:
     ApiKeyAuth:
       type: http
