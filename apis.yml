@@ -92,6 +92,8 @@ apis:
   humanURL: https://getminds.ai/docs/api/overview
   baseURL: https://getminds.ai/api/v1
   tags:
+  - APIKeys
+  tags_raw:
   - API Keys
   properties:
   - type: OpenAPI
@@ -140,6 +142,8 @@ apis:
   humanURL: https://getminds.ai/docs/api/overview
   baseURL: https://getminds.ai/api/v1
   tags:
+  - Authentication
+  tags_raw:
   - Auth
   properties:
   - type: OpenAPI
@@ -399,6 +403,9 @@ apis:
   - type: DataModel
     url: data-model/getminds-data-model.yml
 common:
+- type: CapabilityMap
+  url: capabilities/getminds-capability-edges.yml
+  name: Minds Business Capability Map
 - type: Overlay
   url: overlays/getminds-openapi-overlay.yaml
 - type: Website
