@@ -1,0 +1,80 @@
+slug: getminds
+provider: Minds
+generated_by: planning/capability-mapping/scripts/classify_capabilities.py
+model: claude-opus-5
+frame:
+- Software & Technology
+min_confidence: 0.7
+capability_model:
+  source: https://github.com/vincentmakes/turbo-ea-capabilities
+  license: CC-BY-4.0
+  attribution: Turbo EA Capabilities by Vincent Verdet — Turbo EA, https://github.com/vincentmakes/turbo-ea-capabilities,
+    CC BY 4.0
+  notice: NOTICE
+edge_count: 6
+edges:
+- tag: Research
+  spec_file: getminds-research-api-openapi.yml
+  capability_id: BC-400.30
+  capability_id_l1: BC-400
+  capability_name: Market Intelligence Management
+  confidence: 0.9
+  evidence: '"listResearchMethods  List research methods", "previewStudyResearchPlan  Preview or revise
+    a study research plan", "runStudyQuestions  Confirm and run a multi-question Study block"'
+  reason: Operations design research plans, enumerate research methods, execute study question blocks
+    and generate semantic summaries — i.e. the conduct and analysis of market research studies. Maps cleanly
+    to Market Intelligence Management (market research, customer insights).
+- tag: Studies
+  spec_file: getminds-studies-api-openapi.yml
+  capability_id: BC-400.30
+  capability_id_l1: BC-400
+  capability_name: Market Intelligence Management
+  confidence: 0.85
+  evidence: '"getStudyAnalytics  Get canonical study analytics", "askStudy  Ask a study question", "StudyOutputAudience",
+    "startStudyHeatmap  Analyze an assigned question asset"'
+  reason: 'A Study is the market-research container: audiences, questions, answers, analytics, heatmaps
+    and exports. These operations execute and analyse research studies, which is Market Intelligence Management.
+    Export/download endpoints are incidental plumbing within the same surface.'
+- tag: API Keys
+  spec_file: getminds-api-keys-api-openapi.yml
+  capability_id: BC-4270.40
+  capability_id_l1: BC-4270
+  capability_name: Developer Identity & Credential Management
+  confidence: 0.8
+  evidence: POST /api/v1/api-keys  createApiKey  Create an API key; DELETE /api/v1/api-keys/{keyId}  deleteApiKey  Revoke
+    an API key
+  reason: Issuance, listing and revocation of API credentials for developers consuming the public API
+    maps directly to developer identity and credential management.
+- tag: Audiences
+  spec_file: getminds-audiences-api-openapi.yml
+  capability_id: BC-400.30
+  capability_id_l1: BC-400
+  capability_name: Market Intelligence Management
+  confidence: 0.75
+  evidence: 'GET /api/v1/audiences/{audienceId}/formations  List the Formations of an Audience; POST /api/v1/audiences/{audienceId}/export  Export
+    an Audience brief; schemas: AudienceGrounding, GroundingSource, CohortMemberProfile'
+  reason: Construction, grounding, segmentation (Formations/subgroups) and export of synthetic research
+    audiences serves market research and customer insight generation. Some ambiguity with customer segmentation,
+    but the audiences are research constructs, not the buyer's own customer base.
+- tag: Minds
+  spec_file: getminds-minds-api-openapi.yml
+  capability_id: BC-400.30
+  capability_id_l1: BC-400
+  capability_name: Market Intelligence Management
+  confidence: 0.72
+  evidence: '"Export a Mind persona profile", "retrainMind  Retrain a mind", vendor: "build reusable AI
+    Audiences grounded in their own research"'
+  reason: A "Mind" is a reusable synthetic AI audience/persona used for commercial market research; the
+    operations manage persona creation, training and export. Although the verbs (retrain, regenerate embeddings)
+    look like AI/ML plumbing, the artefact being managed is a market-research audience, so Market Intelligence
+    Management is the capability realised. Moderate confidence because an AI-model-lifecycle reading (BC-610.60)
+    is also defensible.
+- tag: Study Runs
+  spec_file: getminds-study-runs-api-openapi.yml
+  capability_id: BC-400.30
+  capability_id_l1: BC-400
+  capability_name: Market Intelligence Management
+  confidence: 0.7
+  evidence: '"createStudyRun  Create a durable study run", "listStudyRuns  List durable study runs"'
+  reason: Runs are executions of a market-research Study against AI audiences, i.e. fielding research.
+    Thin context (two generic operations, no schemas) so confidence is moderate.
