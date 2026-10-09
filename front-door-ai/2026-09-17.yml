@@ -1,0 +1,31 @@
+# Front Door AI Index — getminds — 2026-09-17
+# AI vocabulary counted on the provider's root page. Generated; do not edit.
+# `score` is null unless ownership is `own` — see front_door_ai.py.
+front_door_ai:
+  slug: getminds
+  lexicon_version: '1.0'
+  probed_at: '2026-09-25'
+  host: getminds.ai
+  final_host: getminds.ai
+  ownership: own
+  owner: getminds
+  shares_host_with: null
+  inherited_from: null
+  alias_of: null
+  verdict: scored
+  score: 12
+  band: 5
+  band_label: prominent
+  host_score: 12
+  density: 8.4
+  words: 1428
+  tiers:
+    agentic: 5
+    core: 7
+    model: 0
+  ambiguous: 0
+  top_terms:
+    AI: 7
+    prompts: 3
+    AI assistant: 1
+    MCP: 1
