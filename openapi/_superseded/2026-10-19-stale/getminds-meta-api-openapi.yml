@@ -1,0 +1,38 @@
+openapi: 3.2.0
+info:
+  title: Minds Public Meta API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: Meta
+paths:
+  /api/v1/openapi.json:
+    get:
+      parameters: []
+      responses:
+        '200':
+          description: OpenAPI 3.1.0 document.
+          content:
+            application/json:
+              schema:
+                type: object
+      operationId: getOpenApiDocument
+      summary: Get the OpenAPI document
+      description: Return this OpenAPI 3.1.0 document. Identical to `/_openapi.json`. No authentication required — the document describes how to authenticate.
+      tags:
+      - Meta
+      security: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'

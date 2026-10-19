@@ -1,0 +1,207 @@
+openapi: 3.2.0
+info:
+  title: Minds Public Billing API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: Billing
+paths:
+  /api/v1/billing/catalog:
+    get:
+      responses:
+        '200':
+          description: Subscription prices, response-credit packs and eligibility.
+      operationId: getBillingCatalog
+      summary: Read existing Stripe subscription and response-credit options
+      tags:
+      - Billing
+      description: Authenticated catalog from the current billing account, with existing prices and purchase eligibility. Final taxes and discounts are confirmed during Checkout. Use the returned Stripe price IDs to start checkout.
+      parameters:
+      - name: currency
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - eur
+          - usd
+        description: Explicit currency preference shared with UI and MCP. Omit for location-based defaults.
+      - name: billingCountry
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Billing-address country for a new PAYG workspace. Existing billing ownership remains unchanged.
+      - name: includeInvoices
+        in: query
+        required: false
+        schema:
+          type: boolean
+        description: Include recent Stripe invoices for an authorized billing owner or admin. Omitted by default.
+  /api/v1/billing/checkout:
+    post:
+      responses:
+        '200':
+          description: Stripe Checkout URL and session ID; payment is confirmed through Stripe webhooks.
+      operationId: startBillingCheckout
+      summary: Start subscription, response-credit or automatic recharge setup checkout
+      tags:
+      - Billing
+      description: Uses existing Stripe prices and billing ownership. Return the URL to the buyer to complete address, tax and payment consent. This does not confirm payment. Send a stable Idempotency-Key for all purchase retries.
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+                additionalProperties: false
+                required:
+                - kind
+                - legalAcceptance
+                properties:
+                  kind:
+                    const: subscription
+                  priceId:
+                    type: string
+                  planType:
+                    enum:
+                    - premium
+                    - team
+                  startTrial:
+                    type: boolean
+                    description: Legacy field. New Starter subscriptions and trials are retired; true is refused.
+                  quantity:
+                    type: integer
+                    minimum: 1
+                  billingCountry:
+                    type: string
+                  currency:
+                    enum:
+                    - usd
+                    - eur
+                  legalAcceptance:
+                    type: object
+                    required:
+                    - termsAccepted
+                    - withdrawalConsent
+                    additionalProperties: false
+                    properties:
+                      termsAccepted:
+                        const: true
+                      withdrawalConsent:
+                        const: true
+              - type: object
+                additionalProperties: false
+                required:
+                - kind
+                - priceId
+                properties:
+                  kind:
+                    const: response_credits
+                  priceId:
+                    type: string
+                  amountMinor:
+                    type: integer
+                    minimum: 1
+                    maximum: 99999999
+                    description: Optional custom budget in minor currency units at the responseCredits.customTopUp source price. The server quotes whole responses and charges their rounded total, never unused budget.
+                  billingCountry:
+                    type: string
+                    description: Billing-address country, required for a new PAYG workspace.
+              - type: object
+                additionalProperties: false
+                required:
+                - kind
+                - priceId
+                - amountMinor
+                - thresholdAmountMinor
+                - monthlyAmountLimit
+                properties:
+                  kind:
+                    const: auto_recharge
+                  priceId:
+                    type: string
+                    description: Current responseCredits.customTopUp source price.
+                  amountMinor:
+                    type: integer
+                    minimum: 1
+                    maximum: 99999999
+                    description: Custom recharge budget in the source currency, quoted as whole responses.
+                  thresholdAmountMinor:
+                    type: integer
+                    minimum: 0
+                    maximum: 99999999
+                    description: Low balance threshold converted to whole responses at the same rate; below the recharge amount.
+                  monthlyAmountLimit:
+                    oneOf:
+                    - type: integer
+                      minimum: 1
+                      maximum: 99999999
+                    - const: none
+                    description: Automatic purchase cap per UTC calendar month, in the saved currency at the published tax basis. EUR includes VAT; USD excludes added sales tax. Must cover at least one recharge; none requires explicit uncapped consent. Manual purchases are independent.
+  /api/v1/billing/invoices/{invoiceId}/pay:
+    post:
+      responses:
+        '200':
+          description: Stripe confirmed invoice payment. Fulfillment follows the signed webhook.
+        '402':
+          description: MPP or x402 payment challenge.
+        '409':
+          description: Invoice unavailable, changed, or payment needs reconciliation.
+      operationId: payBillingInvoice
+      summary: Pay an owned, manually collected Stripe invoice with MPP or x402
+      tags:
+      - Billing
+      description: 'Supports open send_invoice invoices for subscriptions and response-credit purchases. Automatic collection stays on Stripe hosted invoices. The 402 challenge quotes the actual remaining amount including tax and discounts. Keep Minds Bearer authentication; send MPP credentials in Payment-Authorization, or x402 in PAYMENT-SIGNATURE. Native MPP clients may instead use Authorization: Payment with Minds-Authorization: Bearer for account identity. x402 requires mppx route-bound nonces and a configured facilitator; USDC is available only for USD invoices. Reuse the original credential after uncertain responses.'
+      parameters:
+      - name: invoiceId
+        in: path
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: Minds-Authorization
+        schema:
+          type: string
+      - in: header
+        name: Payment-Authorization
+        schema:
+          type: string
+      - in: header
+        name: PAYMENT-SIGNATURE
+        schema:
+          type: string
+      x-payment-info:
+        offers:
+        - intent: charge
+          method: stripe
+          amount: null
+          currency: usd
+          description: Exact remaining invoice amount; requires a business profile on the owning Stripe account.
+        - intent: charge
+          method: stripe
+          amount: null
+          currency: eur
+          description: Exact remaining invoice amount; requires a business profile on the owning Stripe account.
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'

@@ -1,0 +1,12 @@
+{
+ "url": "https://api.getminds.ai/openapi.json",
+ "final": "https://api.getminds.ai/openapi.json",
+ "status": 200,
+ "content_type": "application/json",
+ "bytes": 492796,
+ "sha256": "52b4c87a6485de871036242451374748e027bce4658eff89555b6e80fc695e22",
+ "fetched_at": "2026-10-19",
+ "fetched_by": "APIEvangelist-Harvest/1.0 (+https://apievangelist.com)",
+ "match": "byte-identical",
+ "note": "re-archived: the provider's current document replaced a stale archive (roadmap#793); the old files are in openapi/_superseded/2026-10-19-stale"
+}

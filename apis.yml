@@ -402,6 +402,66 @@ apis:
     url: errors/getminds-problem-types.yml
   - type: DataModel
     url: data-model/getminds-data-model.yml
+- aid: getminds:getminds-acp-api
+  name: Minds ACP API
+  description: The ACP API from Minds — 4 operation(s) for acp.
+  humanURL: https://getminds.ai/mcp/overview
+  baseURL: https://getminds.ai/mcp
+  tags:
+  - ACP
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-acp-api-openapi.yml
+- aid: getminds:getminds-billing-api
+  name: Minds Billing API
+  description: The Billing API from Minds — 3 operation(s) for billing.
+  humanURL: https://getminds.ai/mcp/overview
+  baseURL: https://getminds.ai/mcp
+  tags:
+  - Billing
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-billing-api-openapi.yml
+- aid: getminds:getminds-events-api
+  name: Minds Events API
+  description: The Events API from Minds — 3 operation(s) for events.
+  humanURL: https://getminds.ai/mcp/overview
+  baseURL: https://getminds.ai/mcp
+  tags:
+  - Events
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-events-api-openapi.yml
+- aid: getminds:getminds-integrations-api
+  name: Minds Integrations API
+  description: The Integrations API from Minds — 1 operation(s) for integrations.
+  humanURL: https://getminds.ai/mcp/overview
+  baseURL: https://getminds.ai/mcp
+  tags:
+  - Integrations
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-integrations-api-openapi.yml
+- aid: getminds:getminds-support-api
+  name: Minds Support API
+  description: The Support API from Minds — 1 operation(s) for support.
+  humanURL: https://getminds.ai/mcp/overview
+  baseURL: https://getminds.ai/mcp
+  tags:
+  - Support
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-support-api-openapi.yml
+- aid: getminds:getminds-uploads-api
+  name: Minds Uploads API
+  description: The Uploads API from Minds — 1 operation(s) for uploads.
+  humanURL: https://getminds.ai/mcp/overview
+  baseURL: https://getminds.ai/mcp
+  tags:
+  - Uploads
+  properties:
+  - type: OpenAPI
+    url: openapi/getminds-uploads-api-openapi.yml
 common:
 - type: CapabilityMap
   url: capabilities/getminds-capability-edges.yml

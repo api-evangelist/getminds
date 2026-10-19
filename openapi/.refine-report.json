@@ -4,11 +4,15 @@
     "_original/getminds-openapi.json"
   ],
   "outputs": [
+    "getminds-acp-api-openapi.yml",
     "getminds-api-keys-api-openapi.yml",
     "getminds-agent-runs-api-openapi.yml",
     "getminds-audiences-api-openapi.yml",
     "getminds-auth-api-openapi.yml",
+    "getminds-billing-api-openapi.yml",
     "getminds-chat-api-openapi.yml",
+    "getminds-events-api-openapi.yml",
+    "getminds-integrations-api-openapi.yml",
     "getminds-knowledge-api-openapi.yml",
     "getminds-meta-api-openapi.yml",
     "getminds-minds-api-openapi.yml",
@@ -17,7 +21,9 @@
     "getminds-studies-api-openapi.yml",
     "getminds-study-drafts-api-openapi.yml",
     "getminds-study-runs-api-openapi.yml",
-    "getminds-study-templates-api-openapi.yml"
+    "getminds-study-templates-api-openapi.yml",
+    "getminds-support-api-openapi.yml",
+    "getminds-uploads-api-openapi.yml"
   ],
   "archived": [],
   "errors": [],
@@ -25,11 +31,15 @@
   "notes": [
     "sourced from openapi/_original/ (1 archived document(s)); previously refined output at the top level was skipped rather than re-split",
     "getminds-openapi.json: upgraded openapi 3.1.0 -> OpenAPI 3.2.0",
+    "getminds-openapi.json: declared missing tag: ACP",
     "getminds-openapi.json: declared missing tag: API Keys",
     "getminds-openapi.json: declared missing tag: Agent Runs",
     "getminds-openapi.json: declared missing tag: Audiences",
     "getminds-openapi.json: declared missing tag: Auth",
+    "getminds-openapi.json: declared missing tag: Billing",
     "getminds-openapi.json: declared missing tag: Chat",
+    "getminds-openapi.json: declared missing tag: Events",
+    "getminds-openapi.json: declared missing tag: Integrations",
     "getminds-openapi.json: declared missing tag: Knowledge",
     "getminds-openapi.json: declared missing tag: Meta",
     "getminds-openapi.json: declared missing tag: Minds",
@@ -39,22 +49,9 @@
     "getminds-openapi.json: declared missing tag: Study Drafts",
     "getminds-openapi.json: declared missing tag: Study Runs",
     "getminds-openapi.json: declared missing tag: Study Templates",
-    "apis.yml register: already-registered"
+    "getminds-openapi.json: declared missing tag: Support",
+    "getminds-openapi.json: declared missing tag: Uploads",
+    "apis.yml register: written (+6 apis, 21 total)"
   ],
-  "skipped": [
-    "getminds-agent-runs-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-api-keys-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-audiences-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-auth-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-chat-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-knowledge-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-meta-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-minds-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-models-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-research-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-studies-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-study-drafts-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-study-runs-api-openapi.yml: previously refined output, superseded by openapi/_original/",
-    "getminds-study-templates-api-openapi.yml: previously refined output, superseded by openapi/_original/"
-  ]
+  "skipped": []
 }

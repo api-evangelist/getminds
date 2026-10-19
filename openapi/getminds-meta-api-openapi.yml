@@ -15,7 +15,6 @@ tags:
 paths:
   /api/v1/openapi.json:
     get:
-      parameters: []
       responses:
         '200':
           description: OpenAPI 3.1.0 document.
@@ -29,6 +28,7 @@ paths:
       tags:
       - Meta
       security: []
+      parameters: []
 components:
   securitySchemes:
     ApiKeyAuth:

@@ -15,6 +15,21 @@ tags:
 paths:
   /api/v1/studies/{studyId}/runs:
     get:
+      responses:
+        '200':
+          description: Durable Study runs, newest first, with pagination.hasMore and pagination.nextCursor.
+        '400':
+          description: Invalid query or a cursor outside this filtered Study run list.
+        '401':
+          description: Authentication required.
+        '403':
+          description: Study access denied.
+      operationId: listStudyRuns
+      summary: List durable study runs
+      tags:
+      - Study Runs
+      security:
+      - ApiKeyAuth: []
       parameters:
       - in: path
         name: studyId
@@ -23,6 +38,20 @@ paths:
           type: string
           format: uuid
       - in: query
+        name: before
+        required: false
+        schema:
+          type: string
+          format: uuid
+        description: Continue with pagination.nextCursor from the previous page.
+      - in: query
+        name: clientRequestId
+        required: false
+        schema:
+          type: string
+          format: uuid
+        description: Filter runs by the original question request ID.
+      - in: query
         name: limit
         required: false
         schema:
@@ -30,28 +59,12 @@ paths:
           minimum: 1
           maximum: 100
           default: 20
-      responses:
-        '200':
-          description: Most recent durable study runs.
-      operationId: listStudyRuns
-      summary: List durable study runs
-      tags:
-      - Study Runs
-      security:
-      - ApiKeyAuth: []
     post:
-      parameters:
-      - in: path
-        name: studyId
-        required: true
-        schema:
-          type: string
-          format: uuid
       responses:
         '200':
           description: Research planning is required; no run was accepted.
         '202':
-          description: Run accepted durably.
+          description: 'Run accepted durably. When Minds in the attached Audiences are still training (or being retrained automatically), the run is accepted and stays `queued` until they are ready, then runs with them (`data.waitingFor` counts the Minds it waits for and `data.notReadyCount` all Minds not ready yet; `GET /runs/{runId}` shows `readinessWait` meanwhile); it waits for as long as they are being trained (there is no wait deadline), and fails with `error.code: minds_not_ready`, naming them, only when no Mind can answer and none can be retrained. `data.leftOutMinds` (mindId, name, audienceId) is present when Minds whose training keeps failing are left out so the run need not wait for them; they are retrained automatically and answer later runs once ready. No Mind stays failed: recovery retries it on a growing backoff and finishes an Audience member from its profile facts if training keeps failing.'
         '400':
           description: Invalid study, question, or idempotency key.
         '401':
@@ -61,7 +74,7 @@ paths:
         '404':
           description: Study not found.
         '409':
-          description: Idempotency key reused with different input, or a Mind in an attached Audience has not finished training (code `PANEL_MINDS_NOT_READY`, with `data.notReady` naming them). Retry once training completes.
+          description: 'Idempotency key reused with different input, or no Mind of the attached Audiences can answer and none can be retrained (code `PANEL_MINDS_NOT_READY`, `data.cause: no_mind_can_answer`, with `data.notReady` naming the Minds). Minds still training never refuse a run: it is queued and waits for them. Minds still being prepared after a failed training attempt do not block a run: with at least one Mind and at least half of the Minds it asks able to answer, the run is accepted without them (`data.leftOutMinds`) and they are retrained automatically; with fewer, they are retrained first and the run waits for them.'
       operationId: createStudyRun
       summary: Create a durable study run
       description: Atomically accepts a study question and returns a durable run that can be polled, replayed, or cancelled independently of the request connection.
@@ -69,6 +82,13 @@ paths:
       - Study Runs
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -95,6 +115,22 @@ paths:
                   type: array
                   items:
                     type: object
+                textAttachments:
+                  type: array
+                  description: Pasted material the question is about (a newsletter, an email, a concept text), sent beside the question instead of inside it. Each entry is stored as a Markdown file and treated like an uploaded attachment; respondents read the documents the run reads as material to react to. Counts toward the attachment limit.
+                  items:
+                    type: object
+                    required:
+                    - text
+                    additionalProperties: false
+                    properties:
+                      name:
+                        type: string
+                        maxLength: 200
+                        description: File name for the stored Markdown file.
+                      text:
+                        type: string
+                        minLength: 1
                 links:
                   type: array
                   items:

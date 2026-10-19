@@ -15,14 +15,6 @@ tags:
 paths:
   /api/v1/api-keys/{keyId}:
     delete:
-      parameters:
-      - in: path
-        name: keyId
-        required: true
-        description: 'API key ID from `GET /v1/api-keys` (cuid: `c` followed by 24 lowercase alphanumerics).'
-        schema:
-          type: string
-          pattern: ^c[a-z0-9]{24}$
       responses:
         '204':
           description: API key deleted. Empty body.
@@ -31,7 +23,7 @@ paths:
         '401':
           description: Missing or invalid API key (`Unauthorized`).
         '403':
-          description: 'No active subscription (`Forbidden`): API key access requires an active subscription. Please upgrade to the Premium or Team plan.'
+          description: 'No active subscription (`Forbidden`): API key access requires an active subscription. Please upgrade to the Starter or Pro plan.'
         '404':
           description: '`API key not found`: no key with this ID belongs to the authenticated account.'
       operationId: deleteApiKey
@@ -41,9 +33,16 @@ paths:
       - API Keys
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: keyId
+        required: true
+        description: 'API key ID from `GET /v1/api-keys` (cuid: `c` followed by 24 lowercase alphanumerics).'
+        schema:
+          type: string
+          pattern: ^c[a-z0-9]{24}$
   /api/v1/api-keys:
     get:
-      parameters: []
       responses:
         '200':
           description: API keys ordered by `createdAt` descending.
@@ -61,7 +60,7 @@ paths:
         '401':
           description: Missing or invalid API key (`Unauthorized`).
         '403':
-          description: 'No active subscription (`Forbidden`): API key access requires an active subscription. Please upgrade to the Premium or Team plan.'
+          description: 'No active subscription (`Forbidden`): API key access requires an active subscription. Please upgrade to the Starter or Pro plan.'
       operationId: listApiKeys
       summary: List API keys
       description: List metadata for every API key on the authenticated account, newest first. Secret key values are never returned; the raw key is shown exactly once, in the response of `POST /v1/api-keys`. Requires an active Premium or Team subscription.
@@ -69,8 +68,8 @@ paths:
       - API Keys
       security:
       - ApiKeyAuth: []
-    post:
       parameters: []
+    post:
       responses:
         '201':
           description: API key created. `key` is the raw secret and is only ever returned in this response.
@@ -88,7 +87,7 @@ paths:
         '401':
           description: Missing or invalid API key (`Unauthorized`).
         '403':
-          description: 'No active subscription (`Forbidden`: API key access requires an active subscription. Please upgrade to the Premium or Team plan.) or `API keys are disabled for this SSO-linked account`.'
+          description: 'No active subscription (`Forbidden`: API key access requires an active subscription. Please upgrade to the Starter or Pro plan.) or `API keys are disabled for this SSO-linked account`.'
       operationId: createApiKey
       summary: Create an API key
       description: 'Mint a new API key for the authenticated account and return its secret value exactly once. Store the `key` immediately; it cannot be retrieved again (`GET /v1/api-keys` returns metadata only). The body is optional: send `{ "name": "prod" }` to label the key, or no body at all for an unnamed key. Requires an active Premium or Team subscription. Accounts whose credentials are managed by an SSO identity link cannot mint API keys.'
@@ -117,6 +116,7 @@ paths:
               unnamed:
                 summary: Unnamed key (empty body is also accepted)
                 value: {}
+      parameters: []
 components:
   schemas:
     ApiKeyCreated:

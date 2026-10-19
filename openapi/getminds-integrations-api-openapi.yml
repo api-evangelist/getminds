@@ -1,0 +1,103 @@
+openapi: 3.2.0
+info:
+  title: Minds Public Integrations API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: Integrations
+paths:
+  /api/v1/integrations/figma/comments:
+    post:
+      responses:
+        '200':
+          description: Preview or delivery receipts. Partial delivery must be inspected before retrying.
+        '401':
+          description: Authentication required
+        '409':
+          description: Comment consent, current preview or completed evidence required
+        '422':
+          description: Unsupported frame geometry or missing positioned evidence
+      operationId: exportFigmaFeedback
+      summary: Preview or publish completed Study feedback as native Figma comments
+      tags:
+      - Integrations
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - studyId
+              - runId
+              - frameUrl
+              properties:
+                studyId:
+                  type: string
+                  format: uuid
+                runId:
+                  type: string
+                  format: uuid
+                frameUrl:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                  description: Figma design frame link with node-id.
+                expectedNodeId:
+                  type: string
+                  pattern: ^[0-9]+:[0-9]+$
+                action:
+                  type: string
+                  enum:
+                  - preview
+                  - publish
+                  default: preview
+                feedback:
+                  type: string
+                  enum:
+                  - summary
+                  - heatmap
+                  default: summary
+                messageId:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  description: Completed image heatmap message, required for heatmap feedback.
+                assetKey:
+                  type: string
+                  maxLength: 2000
+                  description: Image asset key; use an empty string for the primary image heatmap.
+                sceneId:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                previewHash:
+                  type: string
+                  pattern: ^[a-f0-9]{64}$
+                  description: Current preview hash, required for publishing.
+                commentKeys:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: string
+                    pattern: ^[a-f0-9]{64}$
+                  description: Explicitly reviewed comment keys, required for publishing.
+      parameters: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'

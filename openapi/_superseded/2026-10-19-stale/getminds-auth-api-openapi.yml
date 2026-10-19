@@ -1,0 +1,50 @@
+openapi: 3.2.0
+info:
+  title: Minds Public Auth API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: Auth
+paths:
+  /api/v1/auth/me:
+    get:
+      parameters: []
+      responses:
+        '200':
+          description: The authenticated user.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - id
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    description: User ID the API key belongs to.
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440000
+        '401':
+          description: Missing or invalid API key (`Unauthorized`).
+      operationId: getAuthenticatedUser
+      summary: Identify the authenticated user
+      description: Return the user ID that the presented API key belongs to. Use it to confirm a key is valid at startup, after rotating keys, or to learn which account an integration is acting as. Any rejected credential returns the same generic 401 `Unauthorized`; the API does not distinguish a missing key from an invalid or revoked one.
+      tags:
+      - Auth
+      security:
+      - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'

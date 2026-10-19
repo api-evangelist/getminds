@@ -15,21 +15,6 @@ tags:
 paths:
   /api/v1/minds/{mindId}/knowledge/{itemId}:
     delete:
-      parameters:
-      - in: path
-        name: mindId
-        required: true
-        description: Mind UUID.
-        schema:
-          type: string
-          format: uuid
-      - in: path
-        name: itemId
-        required: true
-        description: Knowledge item UUID (from the list or add response).
-        schema:
-          type: string
-          format: uuid
       responses:
         '204':
           description: Item, patterns, embeddings, and stored file removed. Empty body.
@@ -48,7 +33,6 @@ paths:
       - Knowledge
       security:
       - ApiKeyAuth: []
-    put:
       parameters:
       - in: path
         name: mindId
@@ -64,6 +48,7 @@ paths:
         schema:
           type: string
           format: uuid
+    put:
       responses:
         '200':
           description: Updated item. This response omits `processing` and `statusUrl`; fetch the list or status endpoint for those.
@@ -108,6 +93,21 @@ paths:
       - Knowledge
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: mindId
+        required: true
+        description: Mind UUID.
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: itemId
+        required: true
+        description: Knowledge item UUID (from the list or add response).
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -128,6 +128,24 @@ paths:
                   description: Updated handbook description
   /api/v1/minds/{mindId}/knowledge/{itemId}/status:
     get:
+      responses:
+        '200':
+          description: Processing state, embedding/pattern counts, and readyForRetrieval.
+        '400':
+          description: Invalid Mind or knowledge item ID.
+        '401':
+          description: Missing or invalid API key.
+        '404':
+          description: Mind or knowledge item not found or access denied.
+        '500':
+          description: Internal server error.
+      operationId: getMindKnowledgeItemStatus
+      summary: Get knowledge ingestion status
+      description: Returns public processing fields and retrieval readiness for one Mind knowledge item. Worker diagnostics are omitted; failures use a generic message. Responses are private and not cached.
+      tags:
+      - Knowledge
+      security:
+      - ApiKeyAuth: []
       parameters:
       - in: path
         name: mindId
@@ -141,32 +159,8 @@ paths:
         schema:
           type: string
           format: uuid
-      responses:
-        '200':
-          description: Processing state, embedding/pattern counts, and readyForRetrieval.
-        '401':
-          description: Missing or invalid API key.
-        '403':
-          description: Caller cannot access this Mind.
-        '404':
-          description: Knowledge item not found.
-      operationId: getMindKnowledgeItemStatus
-      summary: Get knowledge ingestion status
-      description: Returns the durable processing state and retrieval readiness for one Mind knowledge item.
-      tags:
-      - Knowledge
-      security:
-      - ApiKeyAuth: []
   /api/v1/minds/{mindId}/knowledge/enrich:
     post:
-      parameters:
-      - in: path
-        name: mindId
-        required: true
-        description: Mind UUID.
-        schema:
-          type: string
-          format: uuid
       responses:
         '202':
           description: Enrichment queued (identical to the keyword-mode response of `addMindKnowledge`).
@@ -198,6 +192,14 @@ paths:
       - Knowledge
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: mindId
+        required: true
+        description: Mind UUID.
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -219,14 +221,6 @@ paths:
                   regeneratePrompt: false
   /api/v1/minds/{mindId}/knowledge:
     get:
-      parameters:
-      - in: path
-        name: mindId
-        required: true
-        description: Mind UUID.
-        schema:
-          type: string
-          format: uuid
       responses:
         '200':
           description: Knowledge items ordered by `createdAt` descending.
@@ -246,6 +240,7 @@ paths:
                     required:
                     - items
                     - total
+                    - pagination
                     properties:
                       items:
                         type: array
@@ -253,7 +248,23 @@ paths:
                           $ref: '#/components/schemas/KnowledgeItem'
                       total:
                         type: integer
-                        description: Number of items returned (no pagination, so always equals `items.length`).
+                        description: Total number of items attached to this Mind, including other pages.
+                      pagination:
+                        type: object
+                        required:
+                        - limit
+                        - offset
+                        - hasMore
+                        properties:
+                          limit:
+                            type: integer
+                            minimum: 1
+                            maximum: 100
+                          offset:
+                            type: integer
+                            minimum: 0
+                          hasMore:
+                            type: boolean
               examples:
                 list:
                   summary: One file item and one link item
@@ -266,6 +277,9 @@ paths:
                         link: null
                         filePath: portfolio/user-id/1234567890_handbook.pdf
                         isWatched: false
+                        category: employment
+                        relevance: 0.82
+                        evidence: reference
                         processing:
                           status: completed
                           regeneratePrompt: false
@@ -277,6 +291,9 @@ paths:
                         link: https://example.com/article
                         filePath: null
                         isWatched: true
+                        category: uncategorized
+                        relevance: null
+                        evidence: null
                         processing:
                           status: queued
                           regeneratePrompt: false
@@ -284,8 +301,12 @@ paths:
                         createdAt: '2025-12-09T12:00:00.000Z'
                         updatedAt: '2025-12-09T12:00:00.000Z'
                       total: 2
+                      pagination:
+                        limit: 100
+                        offset: 0
+                        hasMore: false
         '400':
-          description: 'Invalid Mind ID: `Mind ID is required` or `Invalid Mind ID format` (not a UUID).'
+          description: 'Invalid pagination or Mind ID: `Mind ID is required` or `Invalid Mind ID format` (not a UUID).'
         '401':
           description: Missing or invalid API key (`Unauthorized`).
         '404':
@@ -294,12 +315,11 @@ paths:
           description: Internal server error.
       operationId: listMindKnowledge
       summary: List knowledge items of a Mind
-      description: 'Return every knowledge item (uploaded file, link, or auto-collected source) attached to a Mind, newest first. There are no query parameters and no pagination: the full list is returned in one response and `total` equals `items.length`. Each item carries its durable background `processing` state (absent for legacy items ingested before processing metadata was recorded) and a `statusUrl` you can poll for embedding/pattern counts and `readyForRetrieval`. Use it after adding knowledge to find item IDs for `PUT`/`DELETE`, or to audit what a Mind was trained on. Access: you must be able to edit the Mind (owner, direct collaborator, or member of the team the Mind is shared with); any other Mind, including public ones, answers 404 `Mind not found or access denied`.'
+      description: 'Return a page of knowledge items (uploaded files, links, or auto-collected sources) attached to a Mind, newest first with ID as a stable tie-breaker. Use limit (default and maximum 100) and offset (default 0). data.total counts all items; data.pagination.hasMore indicates continuation. Each item carries its knowledge `category` (the goal it was collected for, else a one-time reading of its content), its `relevance` (the content review''s 0–1 score for the role or search topic it was reviewed for, shared across Minds) and its `evidence` type (both null until the source has been reviewed), its durable background `processing` state (absent for legacy items ingested before processing metadata was recorded) and a `statusUrl` you can poll for embedding/pattern counts and `readyForRetrieval`. Use it after adding knowledge to find item IDs for `PUT`/`DELETE`, or to audit what a Mind was trained on. Access: you must be able to edit the Mind (owner, direct collaborator, or member of the team the Mind is shared with); any other Mind, including public ones, answers 404 `Mind not found or access denied`.'
       tags:
       - Knowledge
       security:
       - ApiKeyAuth: []
-    post:
       parameters:
       - in: path
         name: mindId
@@ -308,6 +328,20 @@ paths:
         schema:
           type: string
           format: uuid
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+    post:
       responses:
         '202':
           description: Accepted for background processing. File and link modes return the created item (`KnowledgeItemAccepted`); keyword mode returns the queued enrichment job (`KnowledgeEnrichmentAccepted`).
@@ -323,6 +357,7 @@ paths:
                     type: boolean
                     const: true
                   data:
+                    type: object
                     oneOf:
                     - $ref: '#/components/schemas/KnowledgeItemAccepted'
                     - $ref: '#/components/schemas/KnowledgeEnrichmentAccepted'
@@ -369,24 +404,39 @@ paths:
           description: 'Validation error. Path: `Mind ID is required`, `Invalid Mind ID format`. Multipart: `No form data provided`, `Description is required`, `No file provided`, `File too large: {name} ({size}MB). Maximum size is 50MB.`. Remote file: `file.name, file.url, and description are required`, `File URL is not a safe or fetchable public/workspace upload URL`, `Could not fetch file URL (HTTP {status})`, `File exceeds the 50MB knowledge upload limit`. Keywords: `Keywords array must not be empty`, `At least one valid keyword is required`. Link: `Link and description are required (or provide keywords array for web search)`, or the SDK-shape hint `Use { link, description } not { type: ''link'', url }. …` when the body carries `url` instead of `link`.'
         '401':
           description: Missing or invalid API key (`Unauthorized`).
+        '403':
+          description: '`Upload access denied`: a workspace upload requires ownership, a valid signed chat-file capability, or access through the uploader-owned Study that shares the context file. Mind-edit access alone does not grant access to another user’s uploads.'
         '404':
           description: '`Mind not found or access denied`: the Mind does not exist or the caller is not its owner, a direct collaborator, or a member of the team it is shared with.'
+        '413':
+          description: Request exceeds the bounded JSON/multipart limit, or the uploaded file is empty or too large.
         '415':
           description: '`Unsupported Content-Type. Use application/json for links or multipart/form-data for files`.'
         '500':
-          description: 'Storage or database failure: `Failed to upload {filename}: {reason}`, `Failed to create portfolio item`, or `Internal server error`.'
+          description: 'Database failure: `Failed to create portfolio item`, or `Internal server error`.'
+        '502':
+          description: The bounded storage upload failed or returned an invalid receipt.
       operationId: addMindKnowledge
       summary: Add knowledge to a Mind
-      description: 'Attach new knowledge to a Mind. Pick the input by content type and body shape: (1) `multipart/form-data` with a `file` part uploads a document or image (max 50 MB); (2) JSON `{ file: { name, url, type? }, description }` ingests a file the server fetches itself from a public URL or a Minds workspace upload URL (SSRF-protected, 20 s fetch timeout, same 50 MB limit); (3) JSON `{ link, description }` ingests a web page, YouTube video, or paper URL; (4) JSON `{ keywords: [...] }` runs a web search per keyword and adds what it finds. JSON bodies are dispatched in the order `file`, then `keywords`, then link, so send exactly one shape. Modes 1-3 create one knowledge item, return it with `processing.status: queued` and a `statusUrl`; poll that URL (or `GET .../knowledge/{itemId}/status`) until `readyForRetrieval` is true before relying on the content, especially with `sourcePolicy: knowledge_only`. Mode 4 queues a Mind-level enrichment job instead (no item is returned; keywords are trimmed, de-duplicated, and capped at 15); track it via `GET /v1/minds/{mindId}/training`. `regeneratePrompt` (rebuild the system prompt after ingestion succeeds) defaults to `false` for files and links and `true` for keywords. Access: you must be able to edit the Mind (owner, direct collaborator, or member of the team the Mind is shared with); other Minds answer 404 `Mind not found or access denied`.'
+      description: 'Attach new knowledge to a Mind. Pick the input by content type and body shape: (1) `multipart/form-data` with a `file` part uploads a document or image (max 50 MB); (2) JSON `{ file: { name, url, type? }, description }` ingests a file the server fetches itself from a public URL or a Minds workspace upload URL (SSRF-protected, 20 s fetch timeout, same 50 MB limit); (3) JSON `{ link, description }` ingests a web page, YouTube video, or paper URL; (4) JSON `{ keywords: [...] }` runs a web search per keyword and adds what it finds. JSON bodies are dispatched in the order `file`, then `keywords`, then link, so send exactly one shape. Modes 1-3 create one knowledge item, return it with `processing.status: queued` and a `statusUrl`. For files, the text is indexed before the response when it can be read directly (`searchable: true`), so the Mind can use the file at once; tables and charts are added in the background. Otherwise poll that URL (or `GET .../knowledge/{itemId}/status`) until `readyForRetrieval` is true before relying on the content, especially with `sourcePolicy: knowledge_only`. Mode 4 queues a Mind-level enrichment job instead (no item is returned; keywords are trimmed, de-duplicated, and capped at 15); track it via `GET /v1/minds/{mindId}/training`. `regeneratePrompt` (rebuild the system prompt after ingestion succeeds) defaults to `false` for files and links and `true` for keywords. Access: you must be able to edit the Mind (owner, direct collaborator, or member of the team the Mind is shared with); other Minds answer 404 `Mind not found or access denied`.'
       tags:
       - Knowledge
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: mindId
+        required: true
+        description: Mind UUID.
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
           application/json:
             schema:
+              type: object
               oneOf:
               - $ref: '#/components/schemas/AddKnowledgeLinkRequest'
               - $ref: '#/components/schemas/AddKnowledgeRemoteFileRequest'
@@ -439,14 +489,6 @@ paths:
                 contentType: application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword, text/plain, text/markdown, text/rtf, text/csv, application/json, application/xml, image/jpeg, image/png, image/gif, image/webp
   /api/v1/minds/{mindId}/knowledge/patterns:
     get:
-      parameters:
-      - in: path
-        name: mindId
-        required: true
-        description: Mind UUID.
-        schema:
-          type: string
-          format: uuid
       responses:
         '200':
           description: Patterns grouped by framework. `frameworks` is empty when no patterns have been extracted yet.
@@ -533,66 +575,125 @@ paths:
       - Knowledge
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: mindId
+        required: true
+        description: Mind UUID.
+        schema:
+          type: string
+          format: uuid
+  /api/v1/minds/shared/{shareId}/knowledge:
+    get:
+      responses:
+        '200':
+          description: Public references and sphere categories, including source IDs that join patterns to items.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                    - patterns
+                    - items
+                    properties:
+                      patterns:
+                        type: array
+                        items:
+                          type: object
+                        description: Knowledge categories and stored source assessments; no source text.
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                          - id
+                          - description
+                          - link
+                          - createdAt
+                          - isAutoCollected
+                          - tags
+                          - metadata
+                          properties:
+                            id:
+                              type: string
+                            description:
+                              type: string
+                              description: Recorded public title, or hostname.
+                            link:
+                              type: string
+                              format: uri
+                            createdAt:
+                              type: string
+                              format: date-time
+                            isAutoCollected:
+                              type: boolean
+                              const: true
+                            tags:
+                              type: array
+                              items:
+                                type: string
+                            metadata:
+                              type: object
+                              properties:
+                                title:
+                                  type: string
+                                isSocialProfile:
+                                  type: boolean
+                              additionalProperties: false
+                          additionalProperties: false
+        '400':
+          description: Invalid share UUID.
+        '401':
+          description: Authentication required.
+        '404':
+          description: Mind not found or not publicly shared.
+        '500':
+          description: Could not load shared Mind sources.
+      operationId: getSharedMindKnowledge
+      summary: Read the public sources of a shared Mind
+      description: Read the same collected public web references and knowledge-sphere categories shown at /minds/shared/{shareId}. Supply the share UUID from that URL, not the Mind ID. The share must still be public or link-enabled. API authentication is required, but Mind edit access is not. Returns all eligible references after deduplication. Uploaded files, owner-provided Audience corpora, connector records, source bodies and private metadata are excluded. Reading never starts collection or model work. Missing or revoked shares return 404.
+      tags:
+      - Knowledge
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: shareId
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: UUID from the shared Mind URL.
 components:
   schemas:
-    KnowledgePatternFramework:
+    AddKnowledgeRemoteFileRequest:
       type: object
+      title: Remote or workspace file
       required:
-      - id
-      - name
-      - totalOccurrences
-      - aspects
-      properties:
-        id:
-          type: string
-          description: Framework ID (e.g. `ocean`, `disc`, `riasec`).
-        name:
-          type: string
-          description: Framework display name (e.g. `Big Five (OCEAN)`).
-        totalOccurrences:
-          type: integer
-          description: Sum of aspect occurrences within this framework.
-        aspects:
-          type: array
-          description: Aspects with at least one occurrence, sorted by occurrences descending.
-          items:
-            $ref: '#/components/schemas/KnowledgePatternAspect'
-    KnowledgePatternSubAspect:
-      type: object
-      required:
-      - id
-      - name
-      - description
-      - occurrences
-      - evidence
-      properties:
-        id:
-          type: string
-          description: Framework sub-aspect ID, or `(none)` for patterns filed directly under the aspect.
-        name:
-          type: string
-          description: Sub-aspect name, or `(General)` for patterns without a sub-aspect.
-        description:
-          type: string
-          description: Framework definition; empty string when unknown.
-        occurrences:
-          type: integer
-          description: Number of patterns matched to this sub-aspect.
-        evidence:
-          type: array
-          items:
-            $ref: '#/components/schemas/KnowledgePatternEvidence'
-    AddKnowledgeLinkRequest:
-      type: object
-      title: Link
-      required:
-      - link
+      - file
       - description
       properties:
-        link:
-          type: string
-          format: uri
-          description: URL of a web page, YouTube video, or research paper. Note the field is `link`, not `url`.
+        file:
+          type: object
+          required:
+          - name
+          - url
+          properties:
+            name:
+              type: string
+              description: Filename including extension; used to derive the storage name and content type.
+            url:
+              type: string
+              format: uri
+              description: Public/signed HTTPS URL, or an authorized Minds workspace upload URL. Workspace uploads require file ownership, a valid chat-file signature, or shared context access through the uploader’s Study; editing the Mind alone is insufficient. Private-network and unsafe URLs are rejected.
+            type:
+              type: string
+              description: MIME type hint. Falls back to the fetched response `Content-Type`.
         description:
           type: string
           description: Description of the content.
@@ -626,6 +727,107 @@ components:
         message:
           type: string
           example: Knowledge enrichment queued with 2 keyword(s). Web search and content processing will run in background.
+    KnowledgeItemProcessing:
+      type: object
+      description: Durable background-processing state recorded on the item. `status` is the ingestion lifecycle; poll the item `statusUrl` for embedding/pattern counts and the `readyForRetrieval` gate. Only public lifecycle fields are returned. Worker diagnostics and arbitrary metadata are omitted.
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - completed
+          - failed
+          - unknown
+          description: Ingestion lifecycle state.
+        regeneratePrompt:
+          type: boolean
+          description: Whether the Mind system prompt is regenerated once embeddings and patterns finish successfully.
+        error:
+          type: string
+          description: Generic failure message when `status` is `failed`; internal diagnostics are not returned.
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        failedAt:
+          type: string
+          format: date-time
+        embeddingsCreated:
+          type: integer
+          minimum: 0
+        patternsCreated:
+          type: integer
+          minimum: 0
+        promptRegenerated:
+          type: boolean
+          description: Whether the optional prompt-regeneration step completed. Present only when recorded.
+      additionalProperties: false
+    AddKnowledgeLinkRequest:
+      type: object
+      title: Link
+      required:
+      - link
+      - description
+      properties:
+        link:
+          type: string
+          format: uri
+          description: URL of a web page, YouTube video, or research paper. Note the field is `link`, not `url`.
+        description:
+          type: string
+          description: Description of the content.
+        regeneratePrompt:
+          type: boolean
+          default: false
+          description: Regenerate the Mind system prompt once ingestion succeeds.
+    KnowledgePatternEvidence:
+      type: object
+      required:
+      - mind
+      properties:
+        mind:
+          type: string
+          description: The extracted pattern text (citation/quote) supporting this sub-aspect.
+        portfolioItemId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Knowledge item the pattern was extracted from. Present only for privileged callers; null for patterns without a source item.
+        createdAt:
+          type: string
+          format: date-time
+          description: When the pattern was extracted. Present only for privileged callers.
+    KnowledgePatternSubAspect:
+      type: object
+      required:
+      - id
+      - name
+      - description
+      - occurrences
+      - evidence
+      properties:
+        id:
+          type: string
+          description: Framework sub-aspect ID, or `(none)` for patterns filed directly under the aspect.
+        name:
+          type: string
+          description: Sub-aspect name, or `(General)` for patterns without a sub-aspect.
+        description:
+          type: string
+          description: Framework definition; empty string when unknown.
+        occurrences:
+          type: integer
+          description: Number of patterns matched to this sub-aspect.
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgePatternEvidence'
     AddKnowledgeKeywordsRequest:
       type: object
       title: Keyword web search
@@ -643,80 +845,6 @@ components:
           type: boolean
           default: true
           description: Regenerate the Mind system prompt after the collected content is processed.
-    AddKnowledgeRemoteFileRequest:
-      type: object
-      title: Remote or workspace file
-      required:
-      - file
-      - description
-      properties:
-        file:
-          type: object
-          required:
-          - name
-          - url
-          properties:
-            name:
-              type: string
-              description: Filename including extension; used to derive the storage name and content type.
-            url:
-              type: string
-              format: uri
-              description: Public/signed HTTPS URL, or a Minds workspace upload URL (read directly from storage). Private-network and unsafe URLs are rejected.
-            type:
-              type: string
-              description: MIME type hint. Falls back to the fetched response `Content-Type`.
-        description:
-          type: string
-          description: Description of the content.
-        regeneratePrompt:
-          type: boolean
-          default: false
-          description: Regenerate the Mind system prompt once ingestion succeeds.
-    KnowledgeItem:
-      type: object
-      description: A knowledge source attached to a Mind. Exactly one of `link` or `filePath` is set for user-added items; auto-collected sources can also be link-based.
-      required:
-      - id
-      - description
-      - link
-      - filePath
-      - isWatched
-      - createdAt
-      - updatedAt
-      properties:
-        id:
-          type: string
-          format: uuid
-        description:
-          type: string
-          description: Human-readable description supplied when the item was added.
-        link:
-          type:
-          - string
-          - 'null'
-          format: uri
-          description: Source URL for link-based items; null for uploaded files.
-        filePath:
-          type:
-          - string
-          - 'null'
-          description: Storage path of the uploaded file (`portfolio/{userId}/{timestamp}_{name}`); null for link-based items.
-        isWatched:
-          type: boolean
-          description: True when a link item is watched for weekly content changes (managed in the product UI; links only).
-        processing:
-          $ref: '#/components/schemas/KnowledgeItemProcessing'
-          description: Absent for legacy items without recorded processing metadata.
-        statusUrl:
-          type: string
-          description: Relative path of `GET /api/v1/minds/{mindId}/knowledge/{itemId}/status` for this item.
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
     KnowledgePatternAspect:
       type: object
       required:
@@ -741,48 +869,28 @@ components:
           description: Sub-aspects with at least one occurrence, sorted by occurrences descending.
           items:
             $ref: '#/components/schemas/KnowledgePatternSubAspect'
-    KnowledgePatternEvidence:
+    KnowledgePatternFramework:
       type: object
       required:
-      - mind
+      - id
+      - name
+      - totalOccurrences
+      - aspects
       properties:
-        mind:
+        id:
           type: string
-          description: The extracted pattern text (citation/quote) supporting this sub-aspect.
-        portfolioItemId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-          description: Knowledge item the pattern was extracted from. Present only for privileged callers; null for patterns without a source item.
-        createdAt:
+          description: Framework ID (e.g. `ocean`, `disc`, `riasec`).
+        name:
           type: string
-          format: date-time
-          description: When the pattern was extracted. Present only for privileged callers.
-    KnowledgeItemProcessing:
-      type: object
-      description: Durable background-processing state recorded on the item. `status` is the ingestion lifecycle; poll the item `statusUrl` for embedding/pattern counts and the `readyForRetrieval` gate. Workers may add further keys (for example `error` or `promptRegenerated`).
-      required:
-      - status
-      properties:
-        status:
-          type: string
-          enum:
-          - queued
-          - running
-          - completed
-          - failed
-          description: Ingestion lifecycle state.
-        regeneratePrompt:
-          type: boolean
-          description: Whether the Mind system prompt is regenerated once embeddings and patterns finish successfully.
-        error:
-          type: string
-          description: Failure detail when `status` is `failed`, if the worker recorded one.
-        promptRegenerated:
-          type: boolean
-          description: Whether the optional prompt-regeneration step completed. Present only when recorded.
-      additionalProperties: true
+          description: Framework display name (e.g. `Big Five (OCEAN)`).
+        totalOccurrences:
+          type: integer
+          description: Sum of aspect occurrences within this framework.
+        aspects:
+          type: array
+          description: Aspects with at least one occurrence, sorted by occurrences descending.
+          items:
+            $ref: '#/components/schemas/KnowledgePatternAspect'
     KnowledgeItemAccepted:
       type: object
       title: Knowledge item accepted
@@ -805,16 +913,107 @@ components:
           description: Present for link mode only.
         filePath:
           type: string
-          description: 'Present for file modes only: `portfolio/{userId}/{timestamp}_{sanitizedName}`.'
+          description: 'Present for file modes only: `portfolio/{userId}/{uuid}_{sanitizedName}`.'
         createdAt:
           type: string
           format: date-time
         processing:
           $ref: '#/components/schemas/KnowledgeItemProcessing'
-          description: 'Always `{ status: "queued", regeneratePrompt }` at creation.'
+          description: 'Always `{ status: "queued", regeneratePrompt }` at creation: the full reading (tables and charts for files) runs in the background.'
+        searchable:
+          type: boolean
+          description: 'File modes only. True when the file''s text was already indexed before the response, so the Mind can use it at once; its tables and charts are added when `processing` completes. False when the text could not be read in the request (pictures, recordings): poll `statusUrl` until `readyForRetrieval` is true.'
         statusUrl:
           type: string
           description: Relative path of `GET /api/v1/minds/{mindId}/knowledge/{itemId}/status`; poll until `readyForRetrieval` is true.
+    KnowledgeItem:
+      type: object
+      description: A knowledge source attached to a Mind. Exactly one of `link` or `filePath` is set for user-added items; auto-collected sources can also be link-based.
+      required:
+      - id
+      - description
+      - link
+      - filePath
+      - isWatched
+      - category
+      - relevance
+      - evidence
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        description:
+          type: string
+          description: Human-readable description supplied when the item was added.
+        link:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: Source URL for link-based items; null for uploaded files.
+        filePath:
+          type:
+          - string
+          - 'null'
+          description: Storage path of the uploaded file (`portfolio/{userId}/{timestamp}_{name}`); null for link-based items.
+        isWatched:
+          type: boolean
+          description: True when a link item is watched for weekly content changes (managed in the product UI; links only).
+        category:
+          type: string
+          enum:
+          - lived_experience
+          - social_context
+          - category_behaviour
+          - product_context
+          - education
+          - employment
+          - household_context
+          - economic_context
+          - local_context
+          - business_operations
+          - business_market
+          - business_regulation
+          - business_finance
+          - business_workforce
+          - uncategorized
+          description: 'Knowledge category: the search goal the source was collected for, else the category read once from its content. `uncategorized` until either exists, or when the content has no defensible subject.'
+        relevance:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+          description: 'How useful the source is for the stakeholder role or search topic it was reviewed for (0–1): the content review''s score, read once from its content and shared by every Mind reviewed for the same role or topic, not a judgement about this individual Mind. Null until reviewed. Scales the source''s height on the knowledge sphere.'
+        evidence:
+          type:
+          - string
+          - 'null'
+          enum:
+          - primary_data
+          - first_hand
+          - analysis
+          - reporting
+          - opinion
+          - marketing
+          - reference
+          - other
+          - null
+          description: What kind of evidence the source is, read once from its content; null until assessed.
+        processing:
+          $ref: '#/components/schemas/KnowledgeItemProcessing'
+          description: Absent for legacy items without recorded processing metadata.
+        statusUrl:
+          type: string
+          description: Relative path of `GET /api/v1/minds/{mindId}/knowledge/{itemId}/status` for this item.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
   securitySchemes:
     ApiKeyAuth:
       type: http

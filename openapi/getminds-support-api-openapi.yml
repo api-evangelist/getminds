@@ -1,0 +1,42 @@
+openapi: 3.2.0
+info:
+  title: Minds Public Support API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: Support
+paths:
+  /api/v1/support/audiences:
+    get:
+      responses:
+        '200':
+          description: data.grants includes audienceName, audienceId, grant id, reason and expiry; data.nextCursor.
+        '403':
+          description: Verified staff access required.
+      operationId: listStaffAudienceSupport
+      summary: List Audiences authorized for staff support
+      description: Confirmed, active getminds.ai staff only. Lists only customer-granted, unexpired and unrevoked access whose original owner still owns the Audience. Up to 50 grants; pass nextCursor as cursor.
+      tags:
+      - Support
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - name: cursor
+        in: query
+        schema:
+          type: string
+          format: uuid
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'

@@ -1,0 +1,156 @@
+openapi: 3.2.0
+info:
+  title: Minds Public Events API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: Events
+paths:
+  /api/v1/events:
+    get:
+      responses:
+        '200':
+          description: Event definitions, argument filters and payload schemas.
+        '401':
+          description: Unauthorized.
+      operationId: listReadinessEvents
+      summary: List Audience and Study readiness webhook events
+      description: Protocol-specific subscriptions let connected clients react to the same saved readiness state as the workspace. Supports webhook delivery only, with no event-history replay.
+      tags:
+      - Events
+      security:
+      - ApiKeyAuth: []
+      parameters: []
+  /api/v1/events/subscribe:
+    post:
+      responses:
+        '200':
+          description: Subscription id, finite refreshBefore, null cursor and truncated=false.
+        '400':
+          description: Invalid event, arguments or callback.
+        '403':
+          description: Resource or scope denied.
+        '404':
+          description: Resource not found.
+        '502':
+          description: Callback verification failed; data.reason categorizes the failure.
+      operationId: subscribeReadinessEvent
+      summary: Subscribe to one Audience creation or Study run
+      description: 'Accepts an event name, arguments and webhook delivery with HTTPS url and a Standard Webhooks whsec_ secret. The signed callback challenge must succeed before activation. ttlMs requests a lifetime, capped at 24 hours; null grants the finite server default. cursor must be null: historical event replay is unavailable. Repeating the same authenticated principal, callback, event and arguments refreshes the same subscription.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - name
+              - arguments
+              - delivery
+              additionalProperties: false
+              properties:
+                name:
+                  type: string
+                  enum:
+                  - audience.creation.finished
+                  - study.run.finished
+                arguments:
+                  type: object
+                  description: 'Audience: operationId (UUID). Study: studyId and runId (UUIDs). Exact argument schemas are returned by GET /api/v1/events.'
+                delivery:
+                  type: object
+                  required:
+                  - mode
+                  - url
+                  - secret
+                  additionalProperties: false
+                  properties:
+                    mode:
+                      type: string
+                      enum:
+                      - webhook
+                    url:
+                      type: string
+                      format: uri
+                      description: Public HTTPS callback; redirects and private addresses are rejected.
+                    secret:
+                      type: string
+                      description: whsec_ followed by base64 encoding of a 24–64 byte signing key.
+                ttlMs:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                  description: Requested lifetime; capped at 86400000 ms. Omitted/null grants the finite default.
+                cursor:
+                  type: 'null'
+      tags:
+      - Events
+      security:
+      - ApiKeyAuth: []
+      parameters: []
+  /api/v1/events/unsubscribe:
+    post:
+      responses:
+        '200':
+          description: An empty data object.
+        '400':
+          description: Invalid subscription identity.
+        '401':
+          description: Unauthorized.
+      operationId: unsubscribeReadinessEvent
+      summary: Stop one readiness webhook subscription
+      description: Accepts the original event name, arguments and webhook callback URL. Idempotently stops the subscription owned by the current credential principal. Does not cancel the underlying Audience creation or Study run.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - name
+              - arguments
+              - delivery
+              additionalProperties: false
+              properties:
+                name:
+                  type: string
+                  enum:
+                  - audience.creation.finished
+                  - study.run.finished
+                arguments:
+                  type: object
+                  description: The exact original event filter returned by GET /api/v1/events.
+                delivery:
+                  type: object
+                  required:
+                  - mode
+                  - url
+                  additionalProperties: false
+                  properties:
+                    mode:
+                      type: string
+                      enum:
+                      - webhook
+                    url:
+                      type: string
+                      format: uri
+      tags:
+      - Events
+      security:
+      - ApiKeyAuth: []
+      parameters: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'

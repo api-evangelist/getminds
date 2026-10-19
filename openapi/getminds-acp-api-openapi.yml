@@ -1,0 +1,172 @@
+openapi: 3.2.0
+info:
+  title: Minds Public ACP API
+  version: v1
+  description: 'OpenAPI 3.1.0 spec for the Minds public API (https://getminds.ai/api/v1 / https://api.getminds.ai/v1). Generate a typed TypeScript client by running an OpenAPI generator (e.g. `openapi-typescript`) against `/_openapi.json`. Auth: send `Authorization: Bearer minds_…_key`; create keys in Settings → API Keys.'
+servers:
+- url: https://api.getminds.ai
+  description: Production (api subdomain)
+- url: https://getminds.ai
+  description: Production (apex)
+security:
+- ApiKeyAuth: []
+tags:
+- name: ACP
+paths:
+  /api/acp/checkout_sessions/{id}:
+    get:
+      responses:
+        '200':
+          description: OK
+      operationId: getAcpCheckout
+      summary: Read an owned ACP checkout session
+      tags:
+      - ACP
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      responses:
+        '200':
+          description: OK
+      operationId: updateAcpCheckout
+      summary: Refresh an immutable hosted ACP checkout session
+      tags:
+      - ACP
+      description: Send an empty body. Billing details and discounts are updated through continue_url.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/acp/checkout_sessions/{id}/cancel:
+    post:
+      responses:
+        '200':
+          description: OK
+      operationId: cancelAcpCheckout
+      summary: Cancel an owned, open ACP checkout session
+      tags:
+      - ACP
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/acp/checkout_sessions/{id}/complete:
+    post:
+      responses:
+        '200':
+          description: OK
+      operationId: completeAcpCheckout
+      summary: Check completion of an owned hosted ACP session
+      tags:
+      - ACP
+      description: Send an empty body. Returns requires_escalation with continue_url until Stripe confirms buyer checkout. Payment credentials are collected by Stripe.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/acp/checkout_sessions:
+    post:
+      responses:
+        '201':
+          description: ACP session, requiring buyer continuation.
+        '400':
+          description: Unsupported purchase or missing consent.
+        '401':
+          description: Minds authentication required.
+        '409':
+          description: Price or purchase changed.
+      operationId: createAcpCheckout
+      summary: Create an ACP hosted Stripe checkout
+      tags:
+      - ACP
+      description: One subscription or response-credit price per session. Subscription metadata requires explicit legalAcceptance. The buyer completes checkout at continue_url.
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          type: string
+          maxLength: 128
+          pattern: ^[a-zA-Z0-9_-]+$
+      - in: header
+        name: API-Version
+        schema:
+          type: string
+          enum:
+          - '2026-04-17'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - line_items
+              - currency
+              - capabilities
+              properties:
+                line_items:
+                  type: array
+                  minItems: 1
+                  maxItems: 1
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - id
+                    properties:
+                      id:
+                        type: string
+                        pattern: ^price_[a-zA-Z0-9]+$
+                      name:
+                        type: string
+                      unit_amount:
+                        type: integer
+                        minimum: 0
+                currency:
+                  type: string
+                  enum:
+                  - usd
+                  - eur
+                capabilities:
+                  type: object
+                  additionalProperties: true
+                metadata:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    billingCountry:
+                      type: string
+                      maxLength: 10
+                    quantity:
+                      type: integer
+                      minimum: 1
+                    legalAcceptance:
+                      type: object
+                      additionalProperties: false
+                      required:
+                      - termsAccepted
+                      - withdrawalConsent
+                      properties:
+                        termsAccepted:
+                          const: true
+                        withdrawalConsent:
+                          const: true
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'

@@ -15,14 +15,6 @@ tags:
 paths:
   /api/v1/minds/{mindId}:
     delete:
-      parameters:
-      - in: path
-        name: mindId
-        required: true
-        description: Mind UUID.
-        schema:
-          type: string
-          format: uuid
       responses:
         '204':
           description: Mind deleted. Empty body.
@@ -36,12 +28,11 @@ paths:
           description: '`Failed to delete Mind`: the cleanup workflow failed; the Mind may still exist.'
       operationId: deleteMind
       summary: Delete a Mind
-      description: Permanently delete one Mind you own together with its knowledge, patterns, portfolio items, chat history, stored files, and any assigned WhatsApp phone number. Only the owner (the account that created the Mind) can delete it; Minds that are merely shared with you, or visible through a team, Audience, or Study, return 404 `Mind not found` rather than 403. This cannot be undone. To delete several Minds with the same cleanup semantics use `DELETE /v1/minds` with a `mindIds` body.
+      description: Permanently delete one Mind you own together with its knowledge, patterns, portfolio items, chat history, and stored files. Only the owner (the account that created the Mind) can delete it; Minds that are merely shared with you, or visible through a team, Audience, or Study, return 404 `Mind not found` rather than 403. This cannot be undone. To delete several Minds with the same cleanup semantics use `DELETE /v1/minds` with a `mindIds` body.
       tags:
       - Minds
       security:
       - ApiKeyAuth: []
-    get:
       parameters:
       - in: path
         name: mindId
@@ -50,6 +41,7 @@ paths:
         schema:
           type: string
           format: uuid
+    get:
       responses:
         '200':
           description: Mind detail.
@@ -74,12 +66,11 @@ paths:
           description: Internal server error.
       operationId: getMind
       summary: Get a Mind by ID
-      description: Retrieve full details for a single Mind, including its generated system prompt, sharing settings, voice clone status, and knowledge-item count. Returns 403 if the caller is not the owner, team member, direct member, or the Mind is not public.
+      description: Retrieve full details for a single Mind, including its stored profile attributes, generated system prompt, sharing settings, voice clone status, and knowledge-item count. Returns 403 if the caller is not the owner, team member, direct member, or the Mind is not public.
       tags:
       - Minds
       security:
       - ApiKeyAuth: []
-    put:
       parameters:
       - in: path
         name: mindId
@@ -88,6 +79,7 @@ paths:
         schema:
           type: string
           format: uuid
+    put:
       responses:
         '200':
           description: The updated Mind.
@@ -111,6 +103,7 @@ paths:
                     - tags
                     - isPublic
                     - isLinkSharingEnabled
+                    - isSharedWithTeam
                     - publicShareId
                     - profileImageUrl
                     - createdAt
@@ -151,6 +144,8 @@ paths:
                         description: Always false for individual Minds.
                       isLinkSharingEnabled:
                         type: boolean
+                      isSharedWithTeam:
+                        type: boolean
                       publicShareId:
                         type:
                         - string
@@ -170,7 +165,7 @@ paths:
                         type: string
                         format: date-time
         '400':
-          description: '`Invalid Mind ID format`, `Name must be between 2 and 100 characters`, `sourcePolicy must be one of: auto, request_only, knowledge_only`, or `No valid fields to update` (body contained none of the editable fields).'
+          description: '`Invalid Mind ID format`, `Name must be between 2 and 100 characters`, `sourcePolicy must be one of: auto, knowledge_only` or `sourcePolicy=request_only is supported only for Study execution`, or `No valid fields to update` (body contained none of the editable fields).'
         '401':
           description: Missing or invalid API key (`Unauthorized`).
         '403':
@@ -181,11 +176,19 @@ paths:
           description: Internal server error.
       operationId: updateMind
       summary: Update a Mind
-      description: 'Partially update an existing Mind. Send only the fields you want to change; omitted fields are left untouched, and at least one recognised field must be present. Callable by the owner, by a direct Mind member, or by a member of the team the Mind is shared with; everyone else gets 403 `Forbidden`. Existence and permission are checked before the body is validated, so a missing or forbidden Mind always yields 404/403 rather than a field error. Note that `isPublic` is accepted for backward compatibility but always stored as `false` (individual Minds can no longer be made public; share an Audience instead), and `type` values outside `creative`, `expert`, `user` are normalised to `creative`. Sharing changes: `isLinkSharingEnabled: true` keeps or generates the `publicShareId`, `false` clears it.'
+      description: 'Partially update an existing Mind. Send only the fields you want to change; omitted fields are left untouched, and at least one recognised field must be present. Callable by the owner, by a direct Mind member, or by a member of the team the Mind is shared with; everyone else gets 403 `Forbidden`. Existence and permission are checked before the body is validated, so a missing or forbidden Mind always yields 404/403 rather than a field error. Note that `isPublic` is accepted for backward compatibility but always stored as `false` (individual Minds can no longer be made public; share an Audience instead), and `type` values outside `creative`, `expert`, `user` are normalised to `creative`. Sharing changes: `isLinkSharingEnabled: true` keeps or generates the `publicShareId`, `false` clears it; `isSharedWithTeam` (owner or Mind admin) shares the Mind with the owner''s team or removes that access.'
       tags:
       - Minds
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: mindId
+        required: true
+        description: Mind UUID.
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -212,8 +215,163 @@ paths:
                 value:
                   isLinkSharingEnabled: true
                   sourcePolicy: knowledge_only
+              team:
+                summary: Share with the owner's team
+                value:
+                  isSharedWithTeam: true
+  /api/v1/minds/{mindId}/collaborators/{userId}:
+    delete:
+      responses:
+        '200':
+          description: Removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                    - success
+                    properties:
+                      success:
+                        type: boolean
+        '400':
+          description: Invalid id, or the user is the owner (`COLLABORATOR_IS_OWNER`).
+        '401':
+          description: Unauthorized.
+        '403':
+          description: The caller can see the Mind but does not manage its sharing (`COLLABORATORS_MANAGER_ONLY`).
+        '404':
+          description: Mind not found or not visible to the caller, or the person is not a collaborator.
+        '500':
+          description: Internal server error. Responses are private and non-cacheable.
+      operationId: removeMindCollaborator
+      summary: Remove a collaborator from a Mind
+      description: Removes the person's membership and revokes their invitations for this Mind in one step, so an old invitation link cannot restore access. Nobody is emailed. Only the Mind owner or a Mind admin may call it; the owner cannot be removed.
+      tags:
+      - Minds
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - name: mindId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/v1/minds/{mindId}/collaborators:
+    get:
+      responses:
+        '200':
+          description: Collaborators of the Mind.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - userId
+                      - email
+                      - name
+                      - role
+                      - joinedAt
+                      properties:
+                        userId:
+                          type: string
+                          format: uuid
+                          description: Pass to DELETE …/collaborators/{userId}.
+                        email:
+                          type:
+                          - string
+                          - 'null'
+                          format: email
+                        name:
+                          type:
+                          - string
+                          - 'null'
+                        role:
+                          type: string
+                          description: Role granted by the accepted invitation.
+                        joinedAt:
+                          type: string
+                          format: date-time
+        '400':
+          description: Invalid id.
+        '401':
+          description: Unauthorized.
+        '403':
+          description: The caller can see the Mind but does not manage its sharing (`COLLABORATORS_MANAGER_ONLY`).
+        '404':
+          description: Mind not found or not visible to the caller.
+        '500':
+          description: Internal server error. Responses are private and non-cacheable.
+      operationId: listMindCollaborators
+      summary: List the people who accepted an invitation to a Mind
+      description: Returns every collaborator of the Mind (people who accepted an email invitation), oldest first, without the owner. Pending invitations are listed by the invitations endpoints. Only the Mind owner or a Mind admin may call it; anyone else who can see the Mind gets 403.
+      tags:
+      - Minds
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - name: mindId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
   /api/v1/minds/{mindId}/export-download:
     get:
+      responses:
+        '200':
+          description: The export file. `Content-Type` matches the artifact and `Content-Disposition` carries the filename.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            text/markdown:
+              schema:
+                type: string
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.presentationml.presentation:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: '`Invalid Mind ID format` (not a UUID).'
+        '401':
+          description: '`Unauthorized`: the Mind is private and no valid credential was supplied.'
+        '403':
+          description: '`Not authorized` (caller cannot read this private Mind) or `Exporting results requires a Starter plan or above` (neither the caller nor the Mind owner is on a paid plan; `data.code` is `PLAN_LIMIT`, `limitType` `exports`).'
+        '404':
+          description: '`Mind not found`; `Export not found. Try regenerating it.` (the `jobId` is unknown, not yet completed, or does not match this Mind, format, and locale); or `No export available. Generate it first.` (no cached artifact for that format and locale).'
+        '500':
+          description: Internal server error (including a failed download from storage).
+      operationId: downloadMindExport
+      summary: Download a Mind export
+      description: 'Stream the bytes of a completed persona-profile export as a file attachment (`Content-Disposition: attachment`). Pass the `jobId` from `POST /v1/minds/{mindId}/export` (with the same `format` and `locale`) to fetch that job''s artifact, or omit `jobId` to download the cached artifact for the given format and locale. Use `GET /v1/minds/{mindId}/export-status` first when you are not sure the export has finished. Public and link-shared Minds can be downloaded without authentication; private Minds require a caller who can read them (see the Minds access rule). Exports also require the caller or the Mind owner to be on an Individual plan or above.'
+      tags:
+      - Minds
+      security:
+      - ApiKeyAuth: []
       parameters:
       - in: path
         name: mindId
@@ -256,44 +414,59 @@ paths:
           - ar
           - ja
           - ko
+  /api/v1/minds/{mindId}/export-status:
+    get:
       responses:
         '200':
-          description: The export file. `Content-Type` matches the artifact and `Content-Disposition` carries the filename.
+          description: Export status. Completed responses carry the artifact inline unless `metadata=1` was passed.
           content:
-            application/pdf:
+            application/json:
               schema:
-                type: string
-                format: binary
-            text/markdown:
-              schema:
-                type: string
-            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
-              schema:
-                type: string
-                format: binary
-            application/vnd.openxmlformats-officedocument.presentationml.presentation:
-              schema:
-                type: string
-                format: binary
+                $ref: '#/components/schemas/MindExportStatusResponse'
+              examples:
+                processing:
+                  summary: Job still running
+                  value:
+                    data:
+                      status: processing
+                      progress: 40
+                completed:
+                  summary: Markdown artifact ready
+                  value:
+                    data:
+                      status: completed
+                      kind: persona_profile
+                      format: md
+                      filename: Marketing Expert.md
+                      mimeType: text/markdown;charset=utf-8
+                      generatedAt: '2025-12-10T12:00:00.000Z'
+                      downloadUrl: /api/v1/minds/550e8400-e29b-41d4-a716-446655440000/export-download?format=md&locale=en&jobId=1234
+                      content: '# Marketing Expert
+
+
+                        ...'
+                idle:
+                  summary: Nothing generated yet
+                  value:
+                    data:
+                      status: idle
         '400':
           description: '`Invalid Mind ID format` (not a UUID).'
         '401':
           description: '`Unauthorized`: the Mind is private and no valid credential was supplied.'
         '403':
-          description: '`Not authorized` (caller cannot read this private Mind) or `Exporting results requires an Individual plan or above` (neither the caller nor the Mind owner is on a paid plan; `data.code` is `PLAN_LIMIT`, `limitType` `exports`).'
+          description: '`Not authorized` (caller cannot read this private Mind) or `Exporting results requires a Starter plan or above` (neither the caller nor the Mind owner is on a paid plan; `data.code` is `PLAN_LIMIT`, `limitType` `exports`).'
         '404':
-          description: '`Mind not found`; `Export not found. Try regenerating it.` (the `jobId` is unknown, not yet completed, or does not match this Mind, format, and locale); or `No export available. Generate it first.` (no cached artifact for that format and locale).'
+          description: '`Mind not found`.'
         '500':
-          description: Internal server error (including a failed download from storage).
-      operationId: downloadMindExport
-      summary: Download a Mind export
-      description: 'Stream the bytes of a completed persona-profile export as a file attachment (`Content-Disposition: attachment`). Pass the `jobId` from `POST /v1/minds/{mindId}/export` (with the same `format` and `locale`) to fetch that job''s artifact, or omit `jobId` to download the cached artifact for the given format and locale. Use `GET /v1/minds/{mindId}/export-status` first when you are not sure the export has finished. Public and link-shared Minds can be downloaded without authentication; private Minds require a caller who can read them (see the Minds access rule). Exports also require the caller or the Mind owner to be on an Individual plan or above.'
+          description: Internal server error.
+      operationId: getMindExportStatus
+      summary: Get Mind export status
+      description: 'Poll a persona-profile export started with `POST /v1/minds/{mindId}/export`. Pass the `jobId` from the queued response (together with the same `format` and `locale`) to follow that job: `queued` and `processing` carry a `progress` percentage, `failed` carries an `error`, and `completed` returns the artifact inline (`content` for md, `contentBase64` for pdf/docx/pptx) plus a `downloadUrl` for `GET /v1/minds/{mindId}/export-download`. Without `jobId` the endpoint reports the cached artifact for that format and locale (`completed`) or `idle` when nothing has been generated yet. Pass `metadata=1` (or `inline=0`) to omit the inline file bytes and receive only filename, MIME type, and download URL. Public and link-shared Minds can be polled without authentication; private Minds require a caller who can read them (see the Minds access rule). Exports also require the caller or the Mind owner to be on an Individual plan or above.'
       tags:
       - Minds
       security:
       - ApiKeyAuth: []
-  /api/v1/minds/{mindId}/export-status:
-    get:
       parameters:
       - in: path
         name: mindId
@@ -354,67 +527,8 @@ paths:
           enum:
           - '0'
           - 'false'
-      responses:
-        '200':
-          description: Export status. Completed responses carry the artifact inline unless `metadata=1` was passed.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MindExportStatusResponse'
-              examples:
-                processing:
-                  summary: Job still running
-                  value:
-                    data:
-                      status: processing
-                      progress: 40
-                completed:
-                  summary: Markdown artifact ready
-                  value:
-                    data:
-                      status: completed
-                      kind: persona_profile
-                      format: md
-                      filename: Marketing Expert.md
-                      mimeType: text/markdown;charset=utf-8
-                      generatedAt: '2025-12-10T12:00:00.000Z'
-                      downloadUrl: /api/v1/minds/550e8400-e29b-41d4-a716-446655440000/export-download?format=md&locale=en&jobId=1234
-                      content: '# Marketing Expert
-
-
-                        ...'
-                idle:
-                  summary: Nothing generated yet
-                  value:
-                    data:
-                      status: idle
-        '400':
-          description: '`Invalid Mind ID format` (not a UUID).'
-        '401':
-          description: '`Unauthorized`: the Mind is private and no valid credential was supplied.'
-        '403':
-          description: '`Not authorized` (caller cannot read this private Mind) or `Exporting results requires an Individual plan or above` (neither the caller nor the Mind owner is on a paid plan; `data.code` is `PLAN_LIMIT`, `limitType` `exports`).'
-        '404':
-          description: '`Mind not found`.'
-        '500':
-          description: Internal server error.
-      operationId: getMindExportStatus
-      summary: Get Mind export status
-      description: 'Poll a persona-profile export started with `POST /v1/minds/{mindId}/export`. Pass the `jobId` from the queued response (together with the same `format` and `locale`) to follow that job: `queued` and `processing` carry a `progress` percentage, `failed` carries an `error`, and `completed` returns the artifact inline (`content` for md, `contentBase64` for pdf/docx/pptx) plus a `downloadUrl` for `GET /v1/minds/{mindId}/export-download`. Without `jobId` the endpoint reports the cached artifact for that format and locale (`completed`) or `idle` when nothing has been generated yet. Pass `metadata=1` (or `inline=0`) to omit the inline file bytes and receive only filename, MIME type, and download URL. Public and link-shared Minds can be polled without authentication; private Minds require a caller who can read them (see the Minds access rule). Exports also require the caller or the Mind owner to be on an Individual plan or above.'
-      tags:
-      - Minds
-      security:
-      - ApiKeyAuth: []
   /api/v1/minds/{mindId}/export:
     post:
-      parameters:
-      - in: path
-        name: mindId
-        required: true
-        description: Mind UUID.
-        schema:
-          type: string
-          format: uuid
       responses:
         '200':
           description: Cached artifact or queued job.
@@ -435,6 +549,14 @@ paths:
       - Minds
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: mindId
+        required: true
+        description: Mind UUID.
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: false
         content:
@@ -456,14 +578,6 @@ paths:
                   description: Regenerate even when a cached artifact exists.
   /api/v1/minds/{mindId}/patterns:
     get:
-      parameters:
-      - in: path
-        name: mindId
-        required: true
-        description: Mind UUID.
-        schema:
-          type: string
-          format: uuid
       responses:
         '200':
           description: Pattern rows ordered by `createdAt` descending.
@@ -509,8 +623,6 @@ paths:
       - Minds
       security:
       - ApiKeyAuth: []
-  /api/v1/minds/{mindId}/regenerate-embeddings:
-    post:
       parameters:
       - in: path
         name: mindId
@@ -519,6 +631,8 @@ paths:
         schema:
           type: string
           format: uuid
+  /api/v1/minds/{mindId}/regenerate-embeddings:
+    post:
       responses:
         '202':
           description: Embedding rebuild jobs queued.
@@ -537,8 +651,6 @@ paths:
       - Minds
       security:
       - ApiKeyAuth: []
-  /api/v1/minds/{mindId}/regenerate-image:
-    post:
       parameters:
       - in: path
         name: mindId
@@ -547,6 +659,8 @@ paths:
         schema:
           type: string
           format: uuid
+  /api/v1/minds/{mindId}/regenerate-image:
+    post:
       responses:
         '200':
           description: Job enqueued, or skipped because an image already exists.
@@ -607,14 +721,24 @@ paths:
         '404':
           description: '`Mind not found`.'
         '500':
-          description: Internal server error (for example the image queue is unavailable).
+          description: Internal server error.
+        '503':
+          description: Image generation could not be queued; retryable.
       operationId: regenerateMindImage
       summary: Regenerate a Mind's profile image
-      description: 'Queue AI generation of a new profile image for a Mind. The request returns as soon as the job is enqueued; poll `GET /v1/minds/{mindId}` until `profileImageUrl` is set. The job is idempotent: when the Mind already has an image the endpoint returns `enqueued: false` with a `skippedReason` unless `force: true`, in which case the existing image URL is cleared first and a fresh one is generated from the Mind''s name, discipline, and system prompt. Pass `personaContext` to steer the image prompt without altering the stored system prompt. Callable by the owner or by a direct Mind member with the `admin` role; everyone else gets 403 `Forbidden`.'
+      description: 'Queue AI generation of a new profile image for a Mind. The request returns as soon as the job is enqueued; poll `GET /v1/minds/{mindId}` until `profileImageUrl` is set or changes. The job is idempotent: when the Mind already has an image the endpoint returns `enqueued: false` with a `skippedReason` unless `force: true`, in which case the current image stays visible until a fresh portrait generated from the Mind''s name, discipline, and system prompt replaces it. Pass `personaContext` to steer the image prompt without altering the stored system prompt. Callable by the owner or by a direct Mind member with the `admin` role; everyone else gets 403 `Forbidden`.'
       tags:
       - Minds
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: mindId
+        required: true
+        description: Mind UUID.
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: false
         content:
@@ -641,14 +765,6 @@ paths:
                   personaContext: A senior plumber in her fifties, workshop background, warm natural light
   /api/v1/minds/{mindId}/regenerate-prompt:
     post:
-      parameters:
-      - in: path
-        name: mindId
-        required: true
-        description: Mind UUID.
-        schema:
-          type: string
-          format: uuid
       responses:
         '200':
           description: The regenerated prompt has been saved on the Mind.
@@ -710,6 +826,14 @@ paths:
       - Minds
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: mindId
+        required: true
+        description: Mind UUID.
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: false
         content:
@@ -731,17 +855,15 @@ paths:
                   personaContextOverride: She is 42, lives in Leipzig with two teenage children, and is sceptical of subscription pricing.
   /api/v1/minds/{mindId}/retrain:
     post:
-      parameters:
-      - in: path
-        name: mindId
-        required: true
-        description: Mind UUID.
-        schema:
-          type: string
-          format: uuid
       responses:
         '200':
-          description: Retrain queued.
+          description: Retrain queued, or the retrain already in flight.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingStatus'
+        '202':
+          description: 'A Study run is answering with this mind: the retrain is recorded and starts once that run has finished. The training block is the current one, plus `retrainAfterRuns: { studyIds }`.'
           content:
             application/json:
               schema:
@@ -754,19 +876,17 @@ paths:
           description: Caller does not own this Mind.
         '404':
           description: Mind does not exist.
-        '409':
-          description: Mind is still queued or running — a retrain is already in flight.
         '500':
           description: Internal server error.
+        '503':
+          description: 'Another claim kept changing the mind while the retrain was being started (`data.code: MIND_RETRAIN_CONTENDED`, `retryable: true`). Nothing was started; ask again.'
       operationId: retrainMind
       summary: Retrain a mind
-      description: Re-run training for a mind that has finished (status `completed` or `failed`), including a full rebuild of its stored knowledge embeddings before it becomes ready. Atomically claims the mind back to `queued` and re-enqueues the mind-collection worker. Returns 409 if the mind is still `queued` or `running` (a retrain is already in flight). The response is the fresh training block — poll GET /v1/minds/{id}/training until `readyToChat` is true.
+      description: 'Re-run training for a mind. Failed accepted training preserves its verified original sources, settings and worker phase; when that request cannot be verified the mind is rebuilt from its current profile, and its instructions are rewritten from that profile. Ordinary rebuilds regenerate stored knowledge embeddings. The response is the training block — poll GET /v1/minds/{id}/training until `readyToChat` is true. The call never refuses a retrain: if one is already `queued` or `running`, that attempt is returned (200); if a Study run is answering with the mind, the retrain is recorded and starts automatically once the run has finished (202, `retrainAfterRuns.studyIds`).'
       tags:
       - Minds
       security:
       - ApiKeyAuth: []
-  /api/v1/minds/{mindId}/training:
-    get:
       parameters:
       - in: path
         name: mindId
@@ -775,6 +895,8 @@ paths:
         schema:
           type: string
           format: uuid
+  /api/v1/minds/{mindId}/training:
+    get:
       responses:
         '200':
           description: Training status.
@@ -794,14 +916,21 @@ paths:
           description: Internal server error.
       operationId: getMindTrainingStatus
       summary: Poll a mind's training status
-      description: 'Returns the live training lifecycle for a mind. A mind''s `id` exists the instant it is created, but it is only usable once `readyToChat` is `true`. Poll this endpoint after creating a mind in an auto mode (`keywords`, `clone`, `link`) until `readyToChat` flips true. A Mind without a system prompt is never ready: it reports `failed` with `error: { code: ''PROFILE_GEN_FAILED'', retryable: true }` (this covers `manual`-mode minds until their prompt is regenerated, and any Mind whose training ended without a prompt). Minds created before 2026-09-18T21:30:00Z keep their historical readiness. Statuses are `queued`, `running`, `completed`, `failed` (there is no `idle`). On `failed`, `error.retryable` indicates whether `POST /v1/minds/{id}/retrain` is worth calling.'
+      description: 'Returns the live training lifecycle for a mind. A mind''s `id` exists the instant it is created, but it is only usable once `readyToChat` is `true`. Poll this endpoint after creating a mind in an auto mode (`keywords`, `clone`, `link`) until `readyToChat` flips true. The mind keeps learning from its sources in the background after that (`learningInBackground`, then `fullyTrained`); there is no need to wait for it. A Mind without a system prompt is never ready: it reports `failed` with `error: { code: ''PROFILE_GEN_FAILED'', retryable: true }` (this covers `manual`-mode minds until their prompt is regenerated, and any Mind whose training ended without a prompt). Minds created before 2026-09-18T21:30:00Z keep their historical readiness. Statuses are `queued`, `running`, `completed`, `failed` (there is no `idle`). `readyToChat` reports that the mind can answer, NOT that it has researched evidence: read `knowledgeState.fallbackOnly` to tell a mind trained on collected sources apart from one answering from its generated profile alone. On `failed`, `error.retryable` indicates whether `POST /v1/minds/{id}/retrain` is worth calling.'
       tags:
       - Minds
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: mindId
+        required: true
+        description: Mind UUID.
+        schema:
+          type: string
+          format: uuid
   /api/v1/minds:
     delete:
-      parameters: []
       responses:
         '200':
           description: Per-Mind deletion results.
@@ -815,31 +944,8 @@ paths:
       - Minds
       security:
       - ApiKeyAuth: []
+      parameters: []
     get:
-      parameters:
-      - in: query
-        name: search
-        description: Case-insensitive substring match against name, description, and discipline.
-        required: false
-        schema:
-          type: string
-      - in: query
-        name: limit
-        description: Max minds per page.
-        required: false
-        schema:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 100
-      - in: query
-        name: offset
-        description: Number of minds to skip.
-        required: false
-        schema:
-          type: integer
-          minimum: 0
-          default: 0
       responses:
         '200':
           description: A page of minds.
@@ -865,13 +971,42 @@ paths:
           description: Internal server error.
       operationId: listMinds
       summary: List Minds
-      description: List all Minds owned by the authenticated user. Supports text search by name/description/discipline and offset-based pagination. Ephemeral Minds created during in-product chats are excluded.
+      description: 'List the Minds the authenticated user can open, newest first: Minds they own and Minds shared with them directly, with their team, or through an Audience or Study they own or can open (the same rule as GET /api/v1/minds/library). `isOwner` tells owned and shared Minds apart. Supports text search by name/description/discipline and offset-based pagination. Ephemeral Minds created during in-product chats are excluded.'
       tags:
       - Minds
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: query
+        name: search
+        description: Case-insensitive substring match against name, description, and discipline.
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: searchQuery
+        description: Alias of `search`, matching the `list_minds` MCP tool. Sent together with `search`, both must be equal.
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        description: Max minds per page.
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+      - in: query
+        name: offset
+        description: Number of minds to skip.
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
     post:
-      parameters: []
       responses:
         '201':
           description: 'Mind created. The `training` block carries the initial lifecycle state: `queued` for auto modes; for `manual`, not ready (`failed`, retryable) until a system prompt is generated via regenerate-prompt.'
@@ -884,7 +1019,14 @@ paths:
                 - training
                 properties:
                   data:
-                    $ref: '#/components/schemas/MindSummary'
+                    allOf:
+                    - $ref: '#/components/schemas/MindSummary'
+                    - type: object
+                      required:
+                      - profileDetails
+                      properties:
+                        profileDetails:
+                          $ref: '#/components/schemas/MindProfileDetails'
                   training:
                     $ref: '#/components/schemas/TrainingStatus'
         '400':
@@ -892,7 +1034,9 @@ paths:
         '401':
           description: Missing or invalid API key.
         '403':
-          description: 'Plan limit reached (`code: PLAN_LIMIT`).'
+          description: 'Plan limit reached (`code: PLAN_LIMIT`) or workspace creation is disabled.'
+        '404':
+          description: The retry key refers to a Mind outside the current managed workspace.
         '500':
           description: Internal server error.
       operationId: createMind
@@ -902,6 +1046,15 @@ paths:
       - Minds
       security:
       - ApiKeyAuth: []
+      parameters:
+      - name: X-Minds-Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+        description: Stable key for one creation operation, scoped to the authenticated owner. Reuse it with the same payload after a timeout; while the original Mind exists and remains accessible in the current workspace, the key returns that Mind with HTTP 200. Use a fresh key to create another Mind.
       requestBody:
         required: true
         content:
@@ -943,6 +1096,18 @@ paths:
                   contextLink: https://example.com/brand-guidelines
   /api/v1/minds/library:
     get:
+      responses:
+        '200':
+          description: The caller projection. Paged mode returns data plus pageInfo.nextCursor; null means the last page.
+        '401':
+          description: Missing or invalid authentication.
+      operationId: listMindLibrary
+      summary: List the first-party Mind library projection
+      description: 'Returns every Mind the caller can open, with the caller effective role: owned Minds, public Minds, Minds shared directly or with the caller team, and every Mind in an Audience the caller owns, belongs to or that is shared with their team, or in a Study they can open. The paged modes and the unpaged projection apply the same rule. Private configuration fields are omitted when the caller has no member role.'
+      tags:
+      - Minds
+      security:
+      - ApiKeyAuth: []
       parameters:
       - in: query
         name: mode
@@ -1017,124 +1182,126 @@ paths:
           type: string
           enum:
           - '1'
+  /api/v1/user/shareable-sparks:
+    get:
       responses:
         '200':
-          description: The caller projection. Paged mode returns data plus pageInfo.nextCursor; null means the last page.
+          description: Owned Minds in data, plus pagination.
+        '400':
+          description: Invalid pagination or filter.
         '401':
-          description: Missing or invalid authentication.
-      operationId: listMindLibrary
-      summary: List the first-party Mind library projection
-      description: Returns owned and shared Minds with the caller effective role. Private configuration fields are omitted when the caller has no member role.
+          description: Unauthorized.
+      operationId: listShareableMinds
+      summary: List owned Minds available for embedding
       tags:
       - Minds
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - in: query
+        name: includePrivate
+        schema:
+          type: string
+          enum:
+          - 'true'
+          - 'false'
+          - '1'
+          - '0'
 components:
   schemas:
-    MindSummary:
+    MindProfileAttribute:
       type: object
       required:
-      - id
-      - name
-      - description
-      - type
-      - tags
-      - createdAt
-      - updatedAt
+      - label
+      - value
+      - dimension
+      - state
+      - basis
       properties:
-        id:
+        label:
           type: string
-          format: uuid
-          description: Mind ID.
-        name:
-          type: string
-          description: Mind display name.
-        description:
-          type: string
-          description: Short summary of the Mind.
-        type:
-          type: string
-          enum:
-          - creative
-          - expert
-          - user
-          description: Mind archetype.
-        discipline:
+          description: The stored distribution name.
+        value:
           type:
           - string
           - 'null'
-          description: Area of expertise / domain.
-        sourcePolicy:
-          type: string
-          enum:
-          - auto
-          - knowledge_only
-          description: Persisted source policy for this Mind.
-        tags:
-          type: array
-          items:
-            type: string
-          description: User-supplied tags (max 20).
-        profileImageUrl:
+          description: The stored value; null when the profile records the attribute without one (see state).
+        dimension:
           type:
           - string
           - 'null'
-          format: uri
-          description: Avatar image; resolved to an absolute URL.
-        createdAt:
+          description: The shared attribute the value belongs to, or null.
+        canonical:
           type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-    UpdateMindRequest:
-      type: object
-      description: All fields are optional, but at least one must be present. Fields of the wrong type are ignored rather than rejected.
-      properties:
-        name:
-          type: string
-          minLength: 2
-          maxLength: 100
-          description: Display name (trimmed; 2-100 characters after trimming).
-        description:
-          type: string
-          description: Short summary of the Mind (trimmed).
-        type:
+          description: The value in the shared vocabulary, present only when the stored wording is that value (or an age band).
+        state:
           type: string
           enum:
-          - creative
-          - expert
-          - user
-          description: Mind archetype. Case-insensitive; aliases `artist` -> creative and `client` / `consumer` -> user; any other value becomes `creative`.
-        discipline:
-          type: string
-          description: Area of expertise. An empty string clears it (stored as null).
-        systemPrompt:
-          type: string
-          description: Replace the full system prompt verbatim (not trimmed). Use `POST /v1/minds/{mindId}/regenerate-prompt` to rebuild it from the knowledge base instead.
-        sourcePolicy:
+          - assigned
+          - unknown
+          - not_applicable
+          - not_asked
+          - missing
+          - refused
+        basis:
           type: string
           enum:
-          - auto
-          - knowledge_only
-          description: Persisted answer policy. `knowledge_only` always retrieves processed Mind knowledge and fails closed when it cannot support the answer; a request-level setting can never downgrade it. Empty string or null resets to `auto`.
-        tags:
+          - user_target
+          - internal_target
+          - observed
+          - public_evidence
+          - modeled
+          - unknown
+          description: '`modeled` is an assumption without a source.'
+        reason:
+          type: string
+          description: The stored explanation of the basis.
+        options:
           type: array
           items:
             type: string
-          maxItems: 20
-          description: Replaces the tag list. Entries are trimmed, non-string and empty entries are dropped, and only the first 20 are kept.
-        isPublic:
-          type: boolean
-          deprecated: true
-          description: Accepted for backward compatibility but always stored as false. Individual Minds cannot be made public; share an Audience instead.
-        isLinkSharingEnabled:
-          type: boolean
-          description: true keeps or generates a `publicShareId` so the Mind is readable via its share link; false clears it.
-        profileImageUrl:
-          type: string
-          format: uri
-          description: Avatar URL stored as given (not downloaded or re-hosted). An empty string clears the image.
+          description: 'Present on the options of one multi-select question shown as one attribute: `label` is the question and `value` lists these selected options, each in its stored wording.'
+        translations:
+          type: object
+          description: 'Read-only presentation for the caller''s locale (`x-locale` header or `aox-locale` cookie; default `en`): `{ [locale]: { label?, value? } }` with the friendly label a profile shows (a survey question as the attribute it measures, e.g. "Openness to new cuisines"; an awkward answer as a profile value). Only wording that differs from the stored `label`/`value` is present; those stay the identity.'
+          additionalProperties:
+            type: object
+            properties:
+              label:
+                type: string
+              value:
+                type: string
+        figure:
+          type: object
+          description: 'A specific figure inside the stored segment: the exact age in an age band, or an amount derived inside a bracket (approximate).'
+          required:
+          - value
+          - approximate
+          properties:
+            value:
+              type: number
+            unit:
+              type: string
+            unitPosition:
+              type: string
+              enum:
+              - before
+              - after
+            approximate:
+              type: boolean
     MindPattern:
       type: object
       required:
@@ -1193,59 +1360,41 @@ components:
           type: string
           format: date-time
           description: Full rows only.
-    TrainingStatus:
+    MindProfileDetails:
       type: object
+      description: The Mind's stored cohort profile. `defaults` always lists the eight default attributes in this order (age, gender, geography, employment_status, occupation, income, education, life_stage); an empty `values` array means not known. `attributes` lists every other stored attribute in stored order. Nothing is inferred from the persona text.
       required:
-      - status
-      - readyToChat
+      - defaults
+      - attributes
       properties:
-        status:
-          type: string
-          enum:
-          - queued
-          - running
-          - completed
-          - failed
-          description: Training lifecycle state.
-        readyToChat:
-          type: boolean
-          description: True only when training has completed and the mind can answer.
-        message:
-          type:
-          - string
-          - 'null'
-          description: Human-readable progress / status message.
-        startedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          description: When training started (null until running).
-        completedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          description: When training finished (completed or failed).
-        error:
-          type:
-          - object
-          - 'null'
-          description: Present only when status is `failed`.
-          required:
-          - code
-          - retryable
-          properties:
-            code:
-              type: string
-              enum:
-              - COLLECTION_FAILED
-              - PROFILE_GEN_FAILED
-              - TIMEOUT
-              - INTERNAL
-            retryable:
-              type: boolean
-              description: When true, POST /v1/minds/{id}/retrain may recover the mind.
+        defaults:
+          type: array
+          items:
+            type: object
+            required:
+            - dimension
+            - values
+            properties:
+              dimension:
+                type: string
+                enum:
+                - age
+                - gender
+                - geography
+                - employment_status
+                - occupation
+                - income
+                - education
+                - life_stage
+              values:
+                type: array
+                description: One entry per stored value; several values are listed separately, never joined.
+                items:
+                  $ref: '#/components/schemas/MindProfileAttribute'
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/MindProfileAttribute'
     MindExportStatusResponse:
       type: object
       required:
@@ -1364,7 +1513,7 @@ components:
         profileImageUrl:
           type: string
           format: uri
-          description: External avatar URL; downloaded and persisted to Supabase storage.
+          description: Public HTTP(S) raster avatar URL. Remote downloads are limited to 50 MiB and 30 seconds; private destinations and SVG are refused. If download or storage fails, creation retains the original URL.
         generateImage:
           type: boolean
           description: Trigger async AI profile-image generation after creation. Defaults to true for auto-training modes; pass false to opt out.
@@ -1381,13 +1530,29 @@ components:
           - auto
           - knowledge_only
           default: auto
-          description: Persisted source policy. knowledge_only always retrieves processed Mind knowledge and fails closed when it cannot support the answer.
+          description: Persisted source policy. knowledge_only always retrieves processed Mind knowledge and fails closed when it cannot support the answer. In a Study it still reads the stimulus a question is asked about (attached files, images, links), never as a source of facts.
         isLinkSharingEnabled:
           type: boolean
           description: Enable link sharing; generates a `publicShareId`.
         locale:
           type: string
           description: ISO 639-1 code for the auto-generated description language. Falls back to the user's preferredLanguage, then `en`.
+    Pagination:
+      type: object
+      required:
+      - total
+      - limit
+      - offset
+      properties:
+        total:
+          type: integer
+          description: Total matching rows.
+        limit:
+          type: integer
+          description: Page size requested.
+        offset:
+          type: integer
+          description: Number of rows skipped.
     MindDetail:
       type: object
       required:
@@ -1396,6 +1561,8 @@ components:
       - description
       - type
       - tags
+      - profileDetails
+      - filterAttributes
       - isPublic
       - isLinkSharingEnabled
       - knowledgeItemCount
@@ -1433,6 +1600,35 @@ components:
           type: array
           items:
             type: string
+        profileDetails:
+          $ref: '#/components/schemas/MindProfileDetails'
+        filterAttributes:
+          type: array
+          maxItems: 7
+          description: The Mind's filter attributes (perspective, industry, role, country as ISO 3166-1 alpha-2, companySize, technology, businessModel), in that order. Only attributes with a stored value are listed; an empty array means none are recorded. Use them to narrow an Audience with `GET /audiences/{audienceId}/filter-attributes`.
+          items:
+            type: object
+            required:
+            - key
+            - values
+            properties:
+              key:
+                type: string
+                enum:
+                - perspective
+                - industry
+                - role
+                - country
+                - companySize
+                - technology
+                - businessModel
+              values:
+                type: array
+                minItems: 1
+                maxItems: 25
+                items:
+                  type: string
+                  maxLength: 120
         isPublic:
           type: boolean
         isLinkSharingEnabled:
@@ -1471,32 +1667,220 @@ components:
           - running
           - completed
           - failed
-          description: 'Current training lifecycle state, from the same authority as GET /v1/minds/{id}/training. A Mind created from 2026-09-18T21:30:00Z without a system prompt never reports `completed`: it reports `failed` (retryable) until it is retrained. Older Minds keep their historical status. Poll GET /v1/minds/{id}/training for full detail.'
+          - null
+          description: Current training lifecycle state, from the same authority as GET /v1/minds/{id}/training. A failed training attempt is retried automatically until the Mind is ready, so it reports `queued`. Only a Mind without a system prompt reports `failed`, until it is retrained or its prompt is regenerated. Poll GET /v1/minds/{id}/training for full detail.
         readyToChat:
           type: boolean
-          description: True only when training has completed; a mind's id exists before it is ready.
+          description: 'True when the Mind can answer: its training has completed, or it keeps answering with its current version while an update trains. A mind''s id exists before it is ready.'
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
-    Pagination:
+    MindSummary:
       type: object
       required:
-      - total
-      - limit
-      - offset
+      - id
+      - name
+      - description
+      - type
+      - tags
+      - createdAt
+      - updatedAt
       properties:
-        total:
-          type: integer
-          description: Total matching rows.
-        limit:
-          type: integer
-          description: Page size requested.
-        offset:
-          type: integer
-          description: Number of rows skipped.
+        id:
+          type: string
+          format: uuid
+          description: Mind ID.
+        name:
+          type: string
+          description: Mind display name.
+        description:
+          type: string
+          description: Short summary of the Mind.
+        type:
+          type: string
+          enum:
+          - creative
+          - expert
+          - user
+          description: Mind archetype.
+        discipline:
+          type:
+          - string
+          - 'null'
+          description: Area of expertise / domain.
+        sourcePolicy:
+          type: string
+          enum:
+          - auto
+          - knowledge_only
+          description: Persisted source policy for this Mind.
+        tags:
+          type: array
+          items:
+            type: string
+          description: User-supplied tags (max 20).
+        profileImageUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: Avatar image; resolved to an absolute URL.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        isOwner:
+          type: boolean
+          description: 'On list responses: true for Minds the caller owns, false for Minds shared with them.'
+    TrainingStatus:
+      type: object
+      required:
+      - status
+      - readyToChat
+      properties:
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - completed
+          - failed
+          description: Training lifecycle state. A failed attempt is retried automatically until the mind is ready, so it reports `queued`; `failed` is reported only for a mind without a system prompt, until it is retrained or its prompt is regenerated.
+        readyToChat:
+          type: boolean
+          description: 'True when the mind can answer: training has completed, or it keeps answering with its current version while an update trains (`servingPreviousVersion`). This is the moment a mind (and an Audience whose minds all report it) is ready: chat and Studies can use it.'
+        beingRepaired:
+          type: boolean
+          description: 'Present and true while the mind cannot answer yet because its last training attempt failed and it is retrained automatically (`status` is `queued`). Waiting for readiness may stop waiting for it: a Study runs without it when enough others answer.'
+        servingPreviousVersion:
+          type: boolean
+          description: 'Present and true while an update of a ready mind trains: the mind keeps answering with its current version until the update lands.'
+        learningInBackground:
+          type: boolean
+          description: 'True while a mind that is already `readyToChat` keeps learning from its sources in the background: a wider source collection, then a system prompt rebuilt from everything collected. Its answers can still deepen until it settles; nothing needs to wait for it.'
+        fullyTrained:
+          type: boolean
+          description: True once the mind is `readyToChat` and its background knowledge step has settled (`learningInBackground` false). Automatic validation of a new Audience waits for every member to be fully trained.
+        message:
+          type:
+          - string
+          - 'null'
+          description: Human-readable progress / status message.
+        startedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: When training started (null until running).
+        completedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: When training finished (completed or failed).
+        knowledgeState:
+          type:
+          - object
+          - 'null'
+          description: What the mind actually knows, which is a different question from whether it can answer. Null only when the lookup itself failed, which never blocks the readiness fields. `readyToChat` flips true as soon as a profile and system prompt exist; a mind whose collection found nothing keeps one generated training-context item instead and still reports ready. Check `fallbackOnly` before running research on it.
+          required:
+          - sourceCount
+          - researchedSourceCount
+          - embeddingCount
+          - fallbackOnly
+          properties:
+            sourceCount:
+              type: integer
+              description: Knowledge items attached to the mind, including any fallback item.
+            researchedSourceCount:
+              type: integer
+              description: Items that are researched or user-supplied, i.e. not the generated fallback.
+            embeddingCount:
+              type: integer
+              description: Searchable embeddings built from those items.
+            fallbackOnly:
+              type: boolean
+              description: True when the mind answers from its generated profile alone, with no researched or supplied knowledge.
+            fallbackReason:
+              type:
+              - string
+              - 'null'
+              description: Why collection was skipped, e.g. `no_web_without_seeded_corpus`.
+        error:
+          type:
+          - object
+          - 'null'
+          description: Present only when status is `failed` (a mind without a system prompt).
+          required:
+          - code
+          - retryable
+          properties:
+            code:
+              type: string
+              enum:
+              - COLLECTION_FAILED
+              - PROFILE_GEN_FAILED
+              - TIMEOUT
+              - INTERNAL
+            retryable:
+              type: boolean
+              description: When true, POST /v1/minds/{id}/retrain may recover the mind.
+    UpdateMindRequest:
+      type: object
+      description: All fields are optional, but at least one must be present. Fields of the wrong type are ignored rather than rejected.
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Display name (trimmed; 2-100 characters after trimming).
+        description:
+          type: string
+          description: Short summary of the Mind (trimmed).
+        type:
+          type: string
+          enum:
+          - creative
+          - expert
+          - user
+          description: Mind archetype. Case-insensitive; aliases `artist` -> creative and `client` / `consumer` -> user; any other value becomes `creative`.
+        discipline:
+          type: string
+          description: Area of expertise. An empty string clears it (stored as null).
+        systemPrompt:
+          type: string
+          description: Replace the full system prompt verbatim (not trimmed). Use `POST /v1/minds/{mindId}/regenerate-prompt` to rebuild it from the knowledge base instead.
+        sourcePolicy:
+          type: string
+          enum:
+          - auto
+          - knowledge_only
+          description: Persisted answer policy. `knowledge_only` always retrieves processed Mind knowledge and fails closed when it cannot support the answer; a request-level setting can never downgrade it. In a Study it still reads the stimulus a question is asked about (attached files, images, links), never as a source of facts. Empty string or null resets to `auto`.
+        tags:
+          type: array
+          items:
+            type: string
+          maxItems: 20
+          description: Replaces the tag list. Entries are trimmed, non-string and empty entries are dropped, and only the first 20 are kept.
+        isPublic:
+          type: boolean
+          deprecated: true
+          description: Accepted for backward compatibility but always stored as false. Individual Minds cannot be made public; share an Audience instead.
+        isLinkSharingEnabled:
+          type: boolean
+          description: true keeps or generates a `publicShareId` so the Mind is readable via its share link; false clears it.
+        isSharedWithTeam:
+          type: boolean
+          description: Owner or Mind admin. true lets every current and future member of the owner's team open and chat with the Mind; it sends no invitation or notification. false removes that access at once. Sharing requires the owner to be in a team (400 `TEAM_REQUIRED`); anyone else gets 403 `TEAM_SHARE_OWNER_ONLY`.
+        profileImageUrl:
+          type: string
+          format: uri
+          description: Avatar URL stored as given (not downloaded or re-hosted). An empty string clears the image.
   securitySchemes:
     ApiKeyAuth:
       type: http

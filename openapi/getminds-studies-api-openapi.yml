@@ -15,13 +15,6 @@ tags:
 paths:
   /api/v1/studies/{studyId}:
     delete:
-      parameters:
-      - in: path
-        name: studyId
-        required: true
-        schema:
-          type: string
-          format: uuid
       responses:
         '204':
           description: Study deleted.
@@ -40,7 +33,6 @@ paths:
       - Studies
       security:
       - ApiKeyAuth: []
-    get:
       parameters:
       - in: path
         name: studyId
@@ -48,6 +40,7 @@ paths:
         schema:
           type: string
           format: uuid
+    get:
       responses:
         '200':
           description: Study details.
@@ -75,8 +68,6 @@ paths:
       - Studies
       security:
       - ApiKeyAuth: []
-  /api/v1/studies/{studyId}/analytics:
-    get:
       parameters:
       - in: path
         name: studyId
@@ -84,9 +75,28 @@ paths:
         schema:
           type: string
           format: uuid
+      - in: query
+        name: portraits
+        required: false
+        schema:
+          type: string
+          enum:
+          - inline
+        description: 'inline adds `portraits`: a small data: thumbnail per signed portrait URL, for embedded views whose host blocks image origins.'
+  /api/v1/studies/{studyId}/analytics:
+    get:
       responses:
         '200':
           description: Canonical study statistics.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/StudyAnalytics'
         '401':
           description: Missing or invalid authentication.
         '403':
@@ -100,24 +110,23 @@ paths:
       - Studies
       security:
       - ApiKeyAuth: []
-  /api/v1/studies/{studyId}/ask:
-    post:
       parameters:
       - in: path
         name: studyId
         required: true
-        description: Study UUID.
         schema:
           type: string
           format: uuid
+  /api/v1/studies/{studyId}/ask:
+    post:
       responses:
         '200':
-          description: SSE stream of study generation events, or a durable queue receipt when responseMode is queued.
+          description: 'SSE stream of study generation events, or a durable queue receipt (JSON) when responseMode is queued. An explicit responseMode `stream` whose Minds are still training waits with the stream open: a `minds_preparing` event (`waitingFor`, `retraining`, `waitedMs`) per check, then the usual events; if they are not ready within 9 minutes it ends with an `error` event (409 `PANEL_MINDS_NOT_READY`, `cause: minds_training`, with the counts) and nothing is charged. Minds being retrained answer with their current version, so only brand-new Minds are waited for.'
           content:
             text/event-stream:
               schema:
                 type: string
-                description: Server-Sent Events stream. Each `data:` payload is a JSON object matching `StudyAskSseEvent`.
+                description: Server-Sent Events stream. Each `data:` payload is a JSON object matching `StudyAskSseEvent`. Lines starting with `:` are heartbeat comments sent every 15 s so long aggregation is not cut off by 100 s proxy idle timeouts; they carry no data. While attached documents are still being read the stream opens after at most 10 s of silence; an error after it opened arrives as a final `error` event with the HTTP status, message and data it would otherwise have had (for example 422 `ATTACHMENT_PROCESSING_FAILED`).
               examples:
                 result:
                   summary: Final result event
@@ -139,6 +148,32 @@ paths:
                     type: string
                     enum:
                     - queued
+                    - preparing
+                    description: '`preparing` while the run waits for Minds that are still training; it starts on its own once they are ready.'
+                  waitingFor:
+                    type: integer
+                    minimum: 1
+                    description: 'Minds the run waits for before it starts. Present only with `status: preparing`.'
+                  leftOutMinds:
+                    type: array
+                    description: 'Minds whose training keeps failing (they are retried automatically): the Study runs without them (at least one Mind and at least half of the Minds it asks still answer) and they are retrained automatically.'
+                    items:
+                      type: object
+                      required:
+                      - mindId
+                      - name
+                      - audienceId
+                      properties:
+                        mindId:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                        audienceId:
+                          type: string
+                          format: uuid
+                        trainingMessage:
+                          type: string
                   jobId:
                     type: string
                   count:
@@ -160,16 +195,51 @@ paths:
                     - true
           x-event-schema:
             $ref: '#/components/schemas/StudyAskSseEvent'
+        '202':
+          description: 'Default ask (no responseMode) while Minds of the Study are still training: the question was queued instead of streamed and runs on its own once they are ready. Same receipt as responseMode queued (`status: preparing`, `waitingFor`). Poll the Study messages for the answer.'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                - questionBlockId
+                - clientRequestId
+                - queuedMessage
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - queued
+                    - preparing
+                  waitingFor:
+                    type: integer
+                    minimum: 1
+                  jobId:
+                    type: string
+                  questionBlockId:
+                    type: string
+                  clientRequestId:
+                    type: string
+                    format: uuid
+                  queuedMessage:
+                    type: boolean
+                    enum:
+                    - true
         '400':
           description: Missing question, invalid study ID, invalid model override, no attached audiences, or no minds in selected audiences.
         '401':
           description: Missing or invalid API key.
         '403':
-          description: 'Caller cannot access the study, or plan message limit reached (`code: PLAN_LIMIT`).'
+          description: 'Caller cannot access the Study or an attached upload, or plan message limit reached (`code: PLAN_LIMIT`).'
         '404':
           description: Study does not exist.
+        '409':
+          description: 'No Mind of the Study can answer and none can be retrained (`data.code: PANEL_MINDS_NOT_READY`, `data.cause: no_mind_can_answer`), naming the Minds and why their training failed. Minds still training never cause a 409 status: the ask is queued (default, 202; `queued`) or waits in the stream (`stream`, which ends with a `minds_training` error event only after 9 minutes). Nothing ran and nothing was charged.'
         '500':
           description: Internal server error.
+        '503':
+          description: 'The question''s answer format could not be read even after a fresh reading (`code: QUESTION_READING_UNAVAILABLE`, `retryable: true`). Nothing ran and no responses were used; repeat the request. After the stream opened this arrives as the final `error` event with the same status and data.'
       operationId: askStudy
       summary: Ask a study question
       description: Send a question to all minds in a study or a selected subset of attached audiences. Returns a Server-Sent Events stream with start, optional classification, per-mind answers, aggregation progress, final output data, and done events.
@@ -177,6 +247,14 @@ paths:
       - Studies
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        description: Study UUID.
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -201,8 +279,330 @@ paths:
                   links:
                   - label: https://competitor.example.com/onboarding
                     id: competitor-onboarding
+  /api/v1/studies/{studyId}/audiences/{audienceId}:
+    delete:
+      responses:
+        '204':
+          description: The Audience is not attached to the Study.
+        '400':
+          description: Invalid Study or Audience ID, or the Study is not in study mode (code FLOW_NOT_STUDY).
+        '401':
+          description: Missing or invalid authentication.
+        '403':
+          description: The caller cannot work in this Study (code PANEL_FORBIDDEN).
+        '404':
+          description: Study not found (code PANEL_NOT_FOUND).
+      operationId: detachStudyAudience
+      summary: Remove an Audience from a Study
+      description: Detaches an Audience from a Study you can work in, as the web app does. The Audience and its Minds are not deleted, and earlier answers stay in the Study. Removing an Audience that is not attached is a no-op, so a retry is safe.
+      tags:
+      - Studies
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: audienceId
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/v1/studies/{studyId}/audiences:
+    post:
+      responses:
+        '200':
+          description: The requested Audiences are attached.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                    - studyId
+                    - audienceIds
+                    - attached
+                    - alreadyAttached
+                    properties:
+                      studyId:
+                        type: string
+                        format: uuid
+                      audienceIds:
+                        type: array
+                        items:
+                          type: string
+                          format: uuid
+                        description: Every requested Audience, de-duplicated.
+                      attached:
+                        type: array
+                        items:
+                          type: string
+                          format: uuid
+                        description: Audiences this call attached.
+                      alreadyAttached:
+                        type: array
+                        items:
+                          type: string
+                          format: uuid
+                        description: Audiences that were already attached (no-op).
+        '400':
+          description: Invalid Study ID or body (code VALIDATION_ERROR), or the Study is not in study mode (code FLOW_NOT_STUDY).
+        '401':
+          description: Missing or invalid authentication.
+        '402':
+          description: A paid Marketplace Audience needs its add-on subscription (code MARKETPLACE_ADDON_REQUIRED).
+        '403':
+          description: The caller cannot work in this Study (code PANEL_FORBIDDEN).
+        '404':
+          description: Study not found (code PANEL_NOT_FOUND), or an Audience is not accessible (code STUDY_AUDIENCES_INACCESSIBLE, data.audienceIds).
+      operationId: attachStudyAudiences
+      summary: Add Audiences to a Study
+      description: Attaches one or more existing Audiences to a Study you can work in, as the web app does. Every Audience is checked before anything is written, so a refusal attaches none of them. Attaching an attached Audience is a no-op (reported in alreadyAttached), so a retry is safe. When the Study has link sharing enabled, newly attached Audiences and their Minds become publicly readable as well.
+      tags:
+      - Studies
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - audienceIds
+              properties:
+                audienceIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items:
+                    type: string
+                    format: uuid
+                  description: Audience IDs to attach. De-duplicated server-side.
+  /api/v1/studies/{studyId}/collaborators/{userId}:
+    delete:
+      responses:
+        '200':
+          description: Removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                    - success
+                    properties:
+                      success:
+                        type: boolean
+        '400':
+          description: Invalid id, or the user is the owner (`COLLABORATOR_IS_OWNER`).
+        '401':
+          description: Unauthorized.
+        '403':
+          description: The caller can see the Study but does not manage its sharing (`COLLABORATORS_MANAGER_ONLY`).
+        '404':
+          description: Study not found or not visible to the caller, or the person is not a collaborator.
+        '500':
+          description: Internal server error. Responses are private and non-cacheable.
+      operationId: removeStudyCollaborator
+      summary: Remove a collaborator from a Study
+      description: Removes the person's membership and revokes their invitations for this Study in one step, so an old invitation link cannot restore access. Removing a Study collaborator also ends the read access to the Study's Audiences and Minds that being a collaborator gave them. Nobody is emailed. Only the Study owner may call it; the owner cannot be removed.
+      tags:
+      - Studies
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - name: studyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/v1/studies/{studyId}/collaborators:
+    get:
+      responses:
+        '200':
+          description: Collaborators of the Study.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - userId
+                      - email
+                      - name
+                      - role
+                      - joinedAt
+                      properties:
+                        userId:
+                          type: string
+                          format: uuid
+                          description: Pass to DELETE …/collaborators/{userId}.
+                        email:
+                          type:
+                          - string
+                          - 'null'
+                          format: email
+                        name:
+                          type:
+                          - string
+                          - 'null'
+                        role:
+                          type: string
+                          description: Role granted by the accepted invitation.
+                        joinedAt:
+                          type: string
+                          format: date-time
+        '400':
+          description: Invalid id.
+        '401':
+          description: Unauthorized.
+        '403':
+          description: The caller can see the Study but does not manage its sharing (`COLLABORATORS_MANAGER_ONLY`).
+        '404':
+          description: Study not found or not visible to the caller.
+        '500':
+          description: Internal server error. Responses are private and non-cacheable.
+      operationId: listStudyCollaborators
+      summary: List the people who accepted an invitation to a Study
+      description: Returns every collaborator of the Study (people who accepted an email invitation), oldest first, without the owner. Pending invitations are listed by the invitations endpoints. Only the Study owner may call it; anyone else who can see the Study gets 403.
+      tags:
+      - Studies
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - name: studyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/v1/studies/{studyId}/duplicate:
+    post:
+      responses:
+        '200':
+          description: Idempotent replay of the copy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/StudyCreated'
+        '201':
+          description: The new copy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/StudyCreated'
+        '400':
+          description: Invalid Study id or body.
+        '401':
+          description: Authentication required.
+        '402':
+          description: An attached marketplace Audience needs its add-on.
+        '403':
+          description: Plan limit reached, or an attached Audience exceeds the plan's member allowance.
+        '404':
+          description: Study not found, or an attached Audience is not accessible.
+        '409':
+          description: A run of this Study is still live. Retry when it has finished.
+      operationId: duplicateStudy
+      summary: Duplicate a Study
+      description: Creates a private copy of a Study you can access, over the same Audiences and Minds, with every question, answer, chart, heatmap, summary and finished run. A schedule is copied paused. Audiences are referenced, not copied; duplicate an Audience separately to copy its Minds. Refused with 409 while a run of the Study is live. The Idempotency-Key header (or idempotencyKey) replays the same copy with status 200; a new copy returns 201.
+      tags:
+      - Studies
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: header
+        name: Idempotency-Key
+        required: false
+        schema:
+          type: string
+          maxLength: 200
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  description: Name of the copy. Defaults to "<name> (copy)".
+                idempotencyKey:
+                  type: string
+                  description: Retry-safety key; the Idempotency-Key header wins.
   /api/v1/studies/{studyId}/export-download:
     get:
+      responses:
+        '302':
+          description: Redirect to a short-lived signed Storage download URL.
+        '400':
+          description: Job is not completed, unsupported kind/format, or the Study is not in study mode.
+        '401':
+          description: Missing or invalid API key.
+        '403':
+          description: Caller cannot access the Study or this export kind is disabled for their workspace.
+        '404':
+          description: Study, export job, or generated file does not exist.
+        '500':
+          description: Storage not configured, download failed, or internal server error.
+      operationId: downloadStudyExport
+      summary: Download a study export
+      description: Authorize access, then redirect to a short-lived signed Storage URL for a completed export in any supported format. Pass `jobId` for one exact artifact, or `kind` and `format` for the latest completed export of that type. With no query the latest persisted full-report PDF is served. The web service never buffers the export file.
+      tags:
+      - Studies
+      security:
+      - ApiKeyAuth: []
       parameters:
       - in: path
         name: studyId
@@ -243,28 +643,32 @@ paths:
           - csv
           - xls
           - sav
+  /api/v1/studies/{studyId}/export-status:
+    get:
       responses:
-        '302':
-          description: Redirect to a short-lived signed Storage download URL.
+        '200':
+          description: Export status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyExportStatusResponse'
         '400':
-          description: Job is not completed, unsupported kind/format, or the Study is not in study mode.
+          description: Invalid study ID or unsupported study flow.
         '401':
           description: Missing or invalid API key.
         '403':
-          description: Caller cannot access the study.
+          description: Caller cannot access the Study or this export kind is disabled for their workspace.
         '404':
-          description: Study, export job, or generated file does not exist.
+          description: Study, export job, or completed export does not exist.
         '500':
-          description: Storage not configured, download failed, or internal server error.
-      operationId: downloadStudyExport
-      summary: Download a study export
-      description: Authorize access, then redirect to a short-lived signed Storage URL for a completed export in any supported format. Pass `jobId` for one exact artifact, or `kind` and `format` for the latest completed export of that type. With no query the latest persisted full-report PDF is served. The web service never buffers the export file.
+          description: Internal server error.
+      operationId: getStudyExportStatus
+      summary: Get study export status
+      description: Check the status of any queued study export. If `jobId` is omitted, the endpoint can still recover the latest legacy full-report PDF.
       tags:
       - Studies
       security:
       - ApiKeyAuth: []
-  /api/v1/studies/{studyId}/export-status:
-    get:
       parameters:
       - in: path
         name: studyId
@@ -305,40 +709,8 @@ paths:
           - csv
           - xls
           - sav
-      responses:
-        '200':
-          description: Export status.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StudyExportStatusResponse'
-        '400':
-          description: Invalid study ID or unsupported study flow.
-        '401':
-          description: Missing or invalid API key.
-        '403':
-          description: Caller cannot access the study.
-        '404':
-          description: Study, export job, or completed export does not exist.
-        '500':
-          description: Internal server error.
-      operationId: getStudyExportStatus
-      summary: Get study export status
-      description: Check the status of any queued study export. If `jobId` is omitted, the endpoint can still recover the latest legacy full-report PDF.
-      tags:
-      - Studies
-      security:
-      - ApiKeyAuth: []
   /api/v1/studies/{studyId}/export:
     post:
-      parameters:
-      - in: path
-        name: studyId
-        required: true
-        description: Study UUID.
-        schema:
-          type: string
-          format: uuid
       responses:
         '200':
           description: Export queued.
@@ -351,11 +723,13 @@ paths:
         '401':
           description: Missing or invalid API key.
         '403':
-          description: Caller cannot access the study.
+          description: Caller cannot access the Study or this export kind is disabled for their workspace.
         '404':
           description: Study or scheduled run does not exist.
         '500':
           description: Internal server error.
+        '503':
+          description: Temporarily unavailable under load after automatic retries; retry the same request (code EXPORT_TEMPORARILY_UNAVAILABLE).
       operationId: exportStudy
       summary: Queue a study export
       description: Queue any supported study export in the background processor. Poll `getStudyExportStatus` with the returned job ID and download the storage-backed artifact when complete.
@@ -363,6 +737,14 @@ paths:
       - Studies
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        description: Study UUID.
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: false
         content:
@@ -392,18 +774,6 @@ paths:
                   format: sav
   /api/v1/studies/{studyId}/heatmaps/{messageId}/export-download:
     get:
-      parameters:
-      - in: path
-        name: studyId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: path
-        name: messageId
-        required: true
-        schema:
-          type: string
       responses:
         '200':
           description: Website heatmap ZIP archive.
@@ -413,8 +783,6 @@ paths:
       - Studies
       security:
       - ApiKeyAuth: []
-  /api/v1/studies/{studyId}/heatmaps/{messageId}/export-status:
-    get:
       parameters:
       - in: path
         name: studyId
@@ -427,6 +795,8 @@ paths:
         required: true
         schema:
           type: string
+  /api/v1/studies/{studyId}/heatmaps/{messageId}/export-status:
+    get:
       responses:
         '200':
           description: Website heatmap export status.
@@ -436,8 +806,6 @@ paths:
       - Studies
       security:
       - ApiKeyAuth: []
-  /api/v1/studies/{studyId}/heatmaps/{messageId}/export:
-    post:
       parameters:
       - in: path
         name: studyId
@@ -450,6 +818,8 @@ paths:
         required: true
         schema:
           type: string
+  /api/v1/studies/{studyId}/heatmaps/{messageId}/export:
+    post:
       responses:
         '200':
           description: Cached archive or queued export job.
@@ -459,8 +829,29 @@ paths:
       - Studies
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: messageId
+        required: true
+        schema:
+          type: string
   /api/v1/studies/{studyId}/heatmaps/{messageId}:
     get:
+      responses:
+        '200':
+          description: Selected heatmap and queue state; GET also returns saved assetHeatmaps.
+      operationId: getStudyHeatmap
+      summary: Read saved question heatmaps; assetKey selects one video or image
+      tags:
+      - Studies
+      security:
+      - ApiKeyAuth: []
       parameters:
       - in: path
         name: studyId
@@ -477,16 +868,16 @@ paths:
         name: assetKey
         schema:
           type: string
+    post:
       responses:
         '200':
           description: Selected heatmap and queue state; GET also returns saved assetHeatmaps.
-      operationId: getStudyHeatmap
-      summary: Read saved question heatmaps; assetKey selects one video or image
+      operationId: startStudyHeatmap
+      summary: Analyze an assigned question asset; completed asset results are reused
       tags:
       - Studies
       security:
       - ApiKeyAuth: []
-    post:
       parameters:
       - in: path
         name: studyId
@@ -499,15 +890,6 @@ paths:
         required: true
         schema:
           type: string
-      responses:
-        '200':
-          description: Selected heatmap and queue state; GET also returns saved assetHeatmaps.
-      operationId: startStudyHeatmap
-      summary: Analyze an assigned question asset; completed asset results are reused
-      tags:
-      - Studies
-      security:
-      - ApiKeyAuth: []
       requestBody:
         content:
           application/json:
@@ -519,13 +901,6 @@ paths:
                   description: 'Stable asset key from the question attachment: upload path or normalized URL.'
   /api/v1/studies/{studyId}/invitations:
     post:
-      parameters:
-      - in: path
-        name: studyId
-        required: true
-        schema:
-          type: string
-          format: uuid
       responses:
         '200':
           description: Invitations created and delivery failures, if any.
@@ -540,6 +915,13 @@ paths:
       - Studies
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -561,33 +943,13 @@ paths:
                   enum:
                   - member
                   - admin
+                  - viewer
                   default: member
                 inviteEntireTeam:
                   type: boolean
                   default: false
   /api/v1/studies/{studyId}/messages/{messageId}/answers:
     get:
-      parameters:
-      - name: studyId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: messageId
-        in: path
-        required: true
-        schema:
-          type: string
-        description: Assistant message CUID returned in recentResults by get_study_status.
-      - name: scope
-        in: query
-        schema:
-          type: string
-          enum:
-          - full
-          - preview
-          default: full
       responses:
         '200':
           description: Sanitized question output, including per-Audience answers.
@@ -619,15 +981,29 @@ paths:
       - Studies
       security:
       - ApiKeyAuth: []
-  /api/v1/studies/{studyId}/research-plans/preview:
-    post:
       parameters:
-      - in: path
-        name: studyId
+      - name: studyId
+        in: path
         required: true
         schema:
           type: string
           format: uuid
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Assistant message CUID returned in recentResults by get_study_status.
+      - name: scope
+        in: query
+        schema:
+          type: string
+          enum:
+          - full
+          - preview
+          default: full
+  /api/v1/studies/{studyId}/research-plans/preview:
+    post:
       responses:
         '200':
           description: Saved plan draft, per-question response contracts, and confirmation questions.
@@ -640,7 +1016,36 @@ paths:
                 properties:
                   data:
                     type: object
-                    properties: {}
+                    properties:
+                      plan:
+                        $ref: '#/components/schemas/ResearchStudyPlan'
+                      revisionCreatedAt:
+                        type: string
+                        format: date-time
+                        description: When this draft revision was saved.
+                      attachments:
+                        type: array
+                        description: Files the draft carries. Each file a run reads reports whether Minds can open it, before the run.
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            name:
+                              type: string
+                            url:
+                              type: string
+                            kind:
+                              type: string
+                              enum:
+                              - website
+                            reading:
+                              type: string
+                              enum:
+                              - read
+                              - unreadable
+                              - not_read
+                              description: 'unreadable: the file cannot be opened (password-protected or damaged); upload a copy without the password, or a run with it stops before any question. read: opened, nothing wrong found. not_read: not checked (format not checked, or the file could not be fetched).'
         '400':
           description: Invalid request.
         '401':
@@ -653,11 +1058,18 @@ paths:
           description: Draft revision conflict.
       operationId: previewStudyResearchPlan
       summary: Preview or revise a study research plan
-      description: 'Let the research-planning model capture intent, main source, all attached assets, questions, optional methods, semantic outputs, missing inputs, confirmation questions, and a proposed response contract for every question. Clients can deterministically edit response formats and assign durable assets to exact questions. Pass `questions` instead of `request` to transcribe a fixed instrument exactly: text, order, ids, and per-item response contracts are stored as given and no planning model runs. Fetchable remote files are copied into durable Minds chat storage before the versioned draft is saved. Local file:// paths are not uploads. This endpoint never executes research.'
+      description: 'Let the research-planning model capture intent, main source, all attached assets, questions, optional methods, semantic outputs, missing inputs, confirmation questions, and a proposed response contract for every question. Clients can deterministically edit response formats and assign durable assets to exact questions. Pass `questions` instead of `request` to transcribe a fixed instrument exactly: text, order, ids, and per-item response contracts are stored as given and no planning model runs; a revision of a fixed instrument that sends no `questions`, `request` or `refinement` (for example only `answers`) keeps its saved questions. Pass `methodId` (a Study template''s `configuration.methodId`, or any method list_research_methods reports as executable) to run the first module with that registered method, as the web app does: the planner plans for it, or a fixed instrument keeps its questions as supplementary questions; methods that design their own tasks (Van Westendorp, Gabor-Granger, MaxDiff, conjoint, Kano, NPS, TURF and others) add them at execution from the method configuration. Revisions keep the selected method unless another is named. Fetchable remote files are copied into durable Minds chat storage before the versioned draft is saved. Local file:// paths are not uploads. A draft that research-runs would refuse is never returned as confirmable: a method configuration the planner left empty is filled from the request where possible, and anything still missing (price currency, price basis, method configuration, expected respondent material) is returned as a confirmation question with `startReadiness` and `status: needs_input`; revise with `answers` keyed by question id, using the option id for a choice question. This endpoint never executes research.'
       tags:
       - Studies
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -670,7 +1082,7 @@ paths:
                   description: Read the latest owned draft without planning or saving. Requires draftPlanId; cannot be combined with edits or planner inputs.
                 edits:
                   type: object
-                  description: Deterministic edits to a saved revision. Preserves methods and source policy; cannot be combined with planner inputs.
+                  description: Deterministic edits to a saved revision. Preserves methods and enables each Mind’s relevant knowledge; cannot be combined with planner inputs.
                   additionalProperties: false
                   properties:
                     objective:
@@ -699,10 +1111,14 @@ paths:
                           text:
                             type: string
                             maxLength: 2000
+                          response:
+                            $ref: '#/components/schemas/ResearchQuestionResponse'
                           attachmentIds:
                             type: array
                             items:
                               type: string
+                          askIf:
+                            $ref: '#/components/schemas/ResearchQuestionCondition'
                 request:
                   type: string
                 studyLocale:
@@ -718,32 +1134,13 @@ paths:
                   - ja
                   - ko
                   description: Language used for the plan and its eventual study output.
-                sourcePolicy:
+                videoAnalysisStyle:
                   type: string
                   enum:
-                  - request_only
-                  - auto
-                  default: request_only
-                  description: Evidence policy stored in this exact draft revision. request_only keeps a controlled Study closed to retrieved Mind documents and live web. auto is an explicit experimental opt-in to relevant Mind-knowledge retrieval; response-mode rules still control live web search.
-                mindSourcePolicyOverrides:
-                  type: array
-                  maxItems: 2000
-                  description: Experimental checksum-locked Mind assignments. Each Mind UUID may appear once. Unlisted Minds use sourcePolicy; persisted knowledge_only locks remain stricter.
-                  items:
-                    type: object
-                    required:
-                    - mindId
-                    - sourcePolicy
-                    additionalProperties: false
-                    properties:
-                      mindId:
-                        type: string
-                        format: uuid
-                      sourcePolicy:
-                        type: string
-                        enum:
-                        - request_only
-                        - auto
+                  - record
+                  - analyst
+                  default: record
+                  description: Register of the one video summary every Mind of this run reads. record writes down the spoken script, the visible scenes and the on-screen text. analyst deliberately reproduces the pre-2026-09 prompt, which reads tone and intent and raises the study's positive rating bias; use it only to replicate an older run.
                 source:
                   type: object
                   description: The main source. Prompt content is exact respondent-visible material and is separate from planner-only request text.
@@ -767,8 +1164,10 @@ paths:
                       type: string
                     content:
                       type: string
+                      maxLength: 20000
                 attachments:
                   type: array
+                  maxItems: 100
                   description: Files and website assets available to the confirmed run (one question block). Multi-asset blocks require complete question assignments and coverage of every asset; each question receives only its own assets. Empty lists explicitly mean no assets. Remote file URLs are durably imported; kind website remains a website.
                   items:
                     type: object
@@ -791,7 +1190,7 @@ paths:
                         type: string
                 questionAttachments:
                   type: array
-                  description: One-based question-to-attachment-id mapping. Multi-asset blocks require every question to be mapped and every asset to be used. Empty attachmentIds means no assets. Each question may appear at most once.
+                  description: One-based question-to-attachment-id mapping. A question left out receives every asset. An asset placed on no question is shown with every question, including questions mapped to empty attachmentIds. Each question may appear at most once.
                   items:
                     type: object
                     required:
@@ -805,6 +1204,7 @@ paths:
                       attachmentIds:
                         type: array
                         minItems: 0
+                        maxItems: 20
                         uniqueItems: true
                         items:
                           type: string
@@ -825,26 +1225,21 @@ paths:
                     type: string
                 questionResponses:
                   type: object
+                  additionalProperties:
+                    $ref: '#/components/schemas/ResearchQuestionResponse'
                   description: Explicit response-format edits keyed by question ID from the current draft.
+                questions:
+                  $ref: '#/components/schemas/FixedInstrumentQuestions'
+                methodId:
+                  type: string
+                  maxLength: 80
+                  description: 'Registered research method for the first module, such as a Study template''s configuration.methodId (van-westendorp, maxdiff, conjoint, nps, turf, …). Must be executable (list_research_methods); an unknown or unavailable method is a 400. Its configuration is filled from the request, questions and answers where they state it, otherwise asked as a confirmation question. Omitted on a new draft: the planner chooses, and a fixed instrument runs as Custom research (guided-research). Omitted on a revision: the method selected earlier is kept. Cannot be combined with edits or loadLatest.'
                 idempotencyKey:
                   type: string
                   maxLength: 200
                   description: 'Retry-safety key. A repeated preview with the same key returns the draft revision the first attempt saved (`replayed: true`) instead of planning again. The `Idempotency-Key` header takes precedence.'
   /api/v1/studies/{studyId}/research-runs/{runId}:
     get:
-      parameters:
-      - in: path
-        name: studyId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: path
-        name: runId
-        required: true
-        schema:
-          type: string
-          format: uuid
       responses:
         '200':
           description: Durable study status and immutable response contracts.
@@ -858,6 +1253,10 @@ paths:
                   data:
                     type: object
                     properties:
+                      plan:
+                        $ref: '#/components/schemas/ResearchStudyPlan'
+                      executionPlan:
+                        $ref: '#/components/schemas/ResearchStudyPlan'
                       status:
                         type: string
                         enum:
@@ -883,9 +1282,53 @@ paths:
                             description: Questions with recorded incomplete respondent coverage.
                           skipped:
                             type: integer
+                            description: Questions a plan limit kept from running.
                           pct:
                             type: integer
                             description: Settled-question progress, not respondent coverage.
+                      planLimit:
+                        type: object
+                        additionalProperties: true
+                        description: 'With status plan_limited: the PLAN_LIMIT envelope that stopped the run (limitType studyAnswers or responses, limit, current, resumeAvailable).'
+                      skippedQuestions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            index:
+                              type: integer
+                            text:
+                              type: string
+                        description: 'With status plan_limited: the questions not asked, by zero-based plan index. POST research-runs/{runId}/resume runs them in place once the plan allows it.'
+                      memberKnowledge:
+                        type: object
+                        required:
+                        - consulted
+                        - sourcePolicy
+                        - description
+                        description: Whether this run allowed relevant Mind-knowledge retrieval. Ordinary Studies use each Mind’s knowledge alongside the assigned stimulus. Historical and internal evaluation runs retain their recorded policy; show the description to the user.
+                        properties:
+                          consulted:
+                            type: boolean
+                            description: True only when at least one Mind could retrieve its own knowledge.
+                          sourcePolicy:
+                            type: string
+                            enum:
+                            - auto
+                            - request_only
+                            - knowledge_only
+                            description: The run default, before per-Mind overrides.
+                          description:
+                            type: string
+                            description: One sentence that can be shown verbatim.
+                          mindOverrides:
+                            type: object
+                            description: Present only for a preregistered per-Mind source-policy experiment; the run is then not uniform.
+                            properties:
+                              count:
+                                type: integer
+                              consulting:
+                                type: integer
                       respondentStimulusDelivery:
                         type: object
                         description: Configured stimulus channel, not proof of delivery. The frozen base Mind profile excludes per-run stimulus.
@@ -899,7 +1342,8 @@ paths:
                             - none
                           mindProfileIncludesStimulus:
                             type: boolean
-                            enum: []
+                            enum:
+                            - false
                           verification:
                             type: string
                             enum:
@@ -948,6 +1392,86 @@ paths:
                         items:
                           type: object
                           additionalProperties: true
+                      answerConsistency:
+                        type: object
+                        required:
+                        - version
+                        - status
+                        description: After a completed run, each Mind's answers are checked against each other. Counts of Minds and flags; each flagged response artifact carries answerConsistency.flags. Answers are never changed. A check that could not run at all records only version and status failed.
+                        properties:
+                          version:
+                            type: string
+                            enum:
+                            - answer-consistency-v1
+                          status:
+                            type: string
+                            enum:
+                            - checked
+                            - incomplete
+                            - failed
+                            description: 'incomplete: the time budget or a cancellation stopped the check; unchecked Minds are counted. failed: the check could not run, or no flag could be saved.'
+                          checkedMinds:
+                            type: integer
+                            description: Minds whose answers were checked.
+                          flaggedMinds:
+                            type: integer
+                            description: Checked Minds with at least one flag.
+                          flagCount:
+                            type: integer
+                            description: Contradictions found; each pair of answers counts once.
+                          uncheckedMinds:
+                            type: integer
+                            description: Minds whose check could not run; their answers are unflagged, not cleared.
+                          unsavedItems:
+                            type: array
+                            items:
+                              type: integer
+                            description: 'Present only when some answer rows could not store their flags: those question indexes. The other rows keep theirs.'
+                          usage:
+                            type: object
+                            description: Model calls and tokens the check used.
+                            properties:
+                              calls:
+                                type: integer
+                              inputTokens:
+                                type: integer
+                              outputTokens:
+                                type: integer
+                      artifacts:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+                          properties:
+                            answerConsistency:
+                              type: object
+                              required:
+                              - version
+                              - flags
+                              description: Present on a response artifact when a Mind's answer to this question contradicts its answer to another question of the run. Flags only; the answer is unchanged.
+                              properties:
+                                version:
+                                  type: string
+                                  enum:
+                                  - answer-consistency-v1
+                                flags:
+                                  type: array
+                                  items:
+                                    type: object
+                                    required:
+                                    - mindId
+                                    - withItem
+                                    - reason
+                                    properties:
+                                      mindId:
+                                        type: string
+                                        description: The Mind whose answers contradict each other.
+                                      withItem:
+                                        type: integer
+                                        description: Question index of the other answer.
+                                      reason:
+                                        type: string
+                                        description: Why the two answers contradict each other.
                       calculations:
                         type: array
                         items:
@@ -961,13 +1485,11 @@ paths:
           description: Study not found.
       operationId: getStudyResearchStudy
       summary: Get research study status
-      description: Return durable progress, the immutable confirmed plan snapshot with per-question response contracts, response artifacts, deterministic method calculations, and stage readiness for a confirmed multi-question Study run.
+      description: 'Return durable progress, the immutable confirmed plan snapshot with per-question response contracts, response artifacts, deterministic method calculations, and stage readiness for a confirmed multi-question Study run. An item with askIf carries routing on its artifact: askedCount, and the Minds not asked, which are excluded from that item''s responses; an item no Mind was asked is a not_asked artifact. An item gated on an open question''s category also carries gateCoding (per category, how many gate answers were coded into it, and how many into none), with none meaning a verified outside-frame reading. New verified readings include an opaque readingId referencing private source evidence; the evidence itself is not included in public results. Unavailable or unresolved gate readings fail before asking dependent respondents and use the existing retry/error lifecycle. Older artifacts may retain gateCodingUnavailable when a historical worker asked everyone after coding failed.'
       tags:
       - Studies
       security:
       - ApiKeyAuth: []
-  /api/v1/studies/{studyId}/research-runs:
-    post:
       parameters:
       - in: path
         name: studyId
@@ -975,6 +1497,76 @@ paths:
         schema:
           type: string
           format: uuid
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/v1/studies/{studyId}/research-runs/{runId}/resume:
+    post:
+      responses:
+        '200':
+          description: The run is queued again, or was already running.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                    - status
+                    - studyId
+                    - runId
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                        - queued
+                        - already_running
+                      studyId:
+                        type: string
+                        format: uuid
+                      runId:
+                        type: string
+                        format: uuid
+                      jobId:
+                        type: string
+        '400':
+          description: The Study is not a multi-question Study.
+        '401':
+          description: Unauthorized.
+        '403':
+          description: Study access denied.
+        '404':
+          description: Study or run not found.
+        '409':
+          description: The run is not waiting on a plan limit, cannot be resumed automatically (`STUDY_RESUME_UNAVAILABLE`), or the account has no paid plan yet (`ENTITLEMENT_PENDING`).
+      operationId: resumeStudyResearchRun
+      summary: Resume a plan-limited multi-question Study run
+      description: 'Continue a confirmed multi-question run that stopped at a plan limit (`status: plan_limited`), in place and with its original confirmed questions and answer contracts. Questions that already have answers are not asked again. Requires a paid plan; the worker re-checks every remaining allowance before each question, so a run can stop at a limit again.'
+      tags:
+      - Studies
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/v1/studies/{studyId}/research-runs:
+    post:
       responses:
         '200':
           description: Study queued with its immutable confirmed response contracts.
@@ -987,7 +1579,72 @@ paths:
                 properties:
                   data:
                     type: object
-                    properties: {}
+                    properties:
+                      plan:
+                        $ref: '#/components/schemas/ResearchStudyPlan'
+                      questionCount:
+                        type: integer
+                        description: Questions accepted into this run.
+                      requestedQuestionCount:
+                        type: integer
+                        description: Questions in the confirmed plan.
+                      skippedQuestionCount:
+                        type: integer
+                        description: Questions left out because the Free plan Study answer allowance could not cover them. The run stops as plan_limited after the accepted questions and can be resumed once the plan allows it.
+                      leftOutMinds:
+                        type: array
+                        description: 'Present when Minds that are still being prepared (their last training attempt failed past the automatic recovery budget) are left out of the run: at least one Mind and at least half of the Minds it asks still answer, and the left-out Minds are retrained automatically.'
+                        items:
+                          type: object
+                          properties:
+                            mindId:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                            audienceId:
+                              type: string
+                              format: uuid
+                      skippedQuestions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            index:
+                              type: integer
+                            text:
+                              type: string
+                        description: 'Present when questions were skipped: their zero-based plan index and text.'
+                      planLimit:
+                        type: object
+                        additionalProperties: true
+                        description: 'Present when questions were skipped: the PLAN_LIMIT envelope (limitType, limit, current, remaining, periodEnd).'
+                      memberKnowledge:
+                        type: object
+                        required:
+                        - consulted
+                        - sourcePolicy
+                        - description
+                        description: Whether this run allowed relevant Mind-knowledge retrieval. Ordinary Studies use each Mind’s knowledge alongside the assigned stimulus. Historical and internal evaluation runs retain their recorded policy; show the description to the user.
+                        properties:
+                          consulted:
+                            type: boolean
+                          sourcePolicy:
+                            type: string
+                            enum:
+                            - auto
+                            - request_only
+                            - knowledge_only
+                          description:
+                            type: string
+                            description: One sentence that can be shown to the user verbatim.
+                          mindOverrides:
+                            type: object
+                            properties:
+                              count:
+                                type: integer
+                              consulting:
+                                type: integer
         '400':
           description: Plan is incomplete, unconfirmed, invalid, unavailable, or not executable.
         '401':
@@ -997,16 +1654,23 @@ paths:
         '404':
           description: Study or draft not found.
         '409':
-          description: Draft already confirmed for another run, or a Mind in an attached Audience has not finished training (legacy code `PANEL_MINDS_NOT_READY`, with `data.notReady` naming them). Retry once training completes.
+          description: 'Draft already confirmed for another run, or no Mind of the selected Audiences can answer and none can be retrained (legacy code `PANEL_MINDS_NOT_READY`, `data.cause: no_mind_can_answer`, with `data.notReady` naming the Minds). Minds still training never refuse a run: it is queued (`status: preparing`) and starts once they are ready. Minds still being prepared after a failed training attempt are left out when at least one Mind and at least half of the Minds it asks can answer (`leftOutMinds`), and retrained first otherwise; either way they are retrained automatically.'
         '422':
           description: Required respondent-visible image, file, or URL could not be read. The Study is not queued and no quota is used.
       operationId: runStudyQuestions
       summary: Confirm and run a multi-question Study block
-      description: Execute an exact saved research-plan revision after explicit confirmation, including every confirmed per-question response and attachment contract. The server, not the client or model, marks required capabilities reviewed and enforces advanced-method opt-in, method availability, and durable media resolution.
+      description: 'Execute an exact saved research-plan revision after explicit confirmation, including every confirmed per-question response and attachment contract. The server, not the client or model, marks required capabilities reviewed and enforces advanced-method opt-in, method availability, and durable media resolution. Items are answered in order as one respondent would: every Mind answers an item in parallel and sees only its own earlier answers in this run.'
       tags:
       - Studies
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -1059,6 +1723,22 @@ paths:
                   description: Verified caller-team connection for Mind answers and verbatim rendering. Pinned at confirmation; retries must keep the same selection. Supporting analysis retains platform models.
   /api/v1/studies/{studyId}/sharing:
     put:
+      responses:
+        '200':
+          description: Updated sharing state and public share ID.
+        '400':
+          description: Invalid body, or team sharing requested without a team.
+        '401':
+          description: Missing or invalid authentication.
+        '404':
+          description: Study not found or not owned by the caller.
+      operationId: updateStudySharing
+      summary: Update study link and team sharing
+      description: 'Owner only. `isLinkSharingEnabled` enables or disables the public link; enabling it also exposes the attached Audiences and Minds, matching the web app. `isSharedWithTeam: true` lets every current and future member of the owner''s team open the Study (team viewers read only); it sends no invitation or notification, and `false` removes that access at once. Sharing with the team requires the owner to be in a team (400 `TEAM_REQUIRED`). Send either field or both.'
+      tags:
+      - Studies
+      security:
+      - ApiKeyAuth: []
       parameters:
       - in: path
         name: studyId
@@ -1066,40 +1746,21 @@ paths:
         schema:
           type: string
           format: uuid
-      responses:
-        '200':
-          description: Updated sharing state and public share ID.
-        '401':
-          description: Missing or invalid authentication.
-        '404':
-          description: Study not found or not owned by the caller.
-      operationId: updateStudySharing
-      summary: Update study link sharing
-      description: Enable or disable the public link for an existing study. Enabling also exposes its attached Audiences and Minds, matching the web app.
-      tags:
-      - Studies
-      security:
-      - ApiKeyAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-              - isLinkSharingEnabled
+              minProperties: 1
+              additionalProperties: false
               properties:
                 isLinkSharingEnabled:
                   type: boolean
+                isSharedWithTeam:
+                  type: boolean
   /api/v1/studies/{studyId}/summary:
     get:
-      parameters:
-      - in: path
-        name: studyId
-        required: true
-        schema:
-          type: string
-          format: uuid
       responses:
         '200':
           description: Persisted semantic summary.
@@ -1122,12 +1783,11 @@ paths:
           description: Study not found.
       operationId: getStudySemanticSummary
       summary: Get a study semantic summary
-      description: Return the persisted whole-study summary, semantic output blocks, staleness, and message coverage. Renderers are hints; consumers may introduce new UI logic without changing evidence contracts.
+      description: 'Return the persisted whole-study summary, semantic output blocks, staleness, message coverage, and `nextSteps`: the suggested follow-up questions from the latest finished run. Renderers are hints; consumers may introduce new UI logic without changing evidence contracts.'
       tags:
       - Studies
       security:
       - ApiKeyAuth: []
-    post:
       parameters:
       - in: path
         name: studyId
@@ -1135,6 +1795,7 @@ paths:
         schema:
           type: string
           format: uuid
+    post:
       responses:
         '200':
           description: Generated semantic summary.
@@ -1155,6 +1816,10 @@ paths:
           description: Study access denied.
         '404':
           description: Study not found.
+        '409':
+          description: A newer generation or deletion superseded this request; reload before retrying.
+        '413':
+          description: Summary request exceeds 4 KiB.
       operationId: refreshStudySemanticSummary
       summary: Generate or refresh a study semantic summary
       description: Generate and persist a whole-study summary with flexible semantic blocks. Visual-source evidence is represented as heatmaps rather than generic distribution charts.
@@ -1162,26 +1827,33 @@ paths:
       - Studies
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: studyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                force:
+                  type: boolean
+                  default: false
+                length:
+                  type: string
+                  enum:
+                  - short
+                  - standard
+                  - detailed
+                  default: standard
   /api/v1/studies:
     get:
-      parameters:
-      - in: query
-        name: limit
-        required: false
-        description: Max studies per page.
-        schema:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 100
-      - in: query
-        name: offset
-        required: false
-        description: Number of studies to skip.
-        schema:
-          type: integer
-          minimum: 0
-          default: 0
       responses:
         '200':
           description: A page of studies.
@@ -1199,19 +1871,52 @@ paths:
                       $ref: '#/components/schemas/StudySummary'
                   pagination:
                     $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Invalid `search`.
         '401':
           description: Missing or invalid API key.
         '500':
           description: Internal server error.
       operationId: listStudies
       summary: List studies
-      description: List Studies owned by the authenticated user. Each Study embeds its attached Audiences and their member Minds.
+      description: List Studies owned by the authenticated user, ordered by updatedAt descending and then id descending. `search` (alias `searchQuery`) filters by name. Each Study embeds its attached Audiences and their member Minds. Offset pages may shift if Studies change between requests.
       tags:
       - Studies
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: query
+        name: search
+        required: false
+        description: Case-insensitive substring match against the Study name (trimmed, at most 200 characters). `pagination.total` counts the matches.
+        schema:
+          type: string
+          maxLength: 200
+      - in: query
+        name: searchQuery
+        required: false
+        description: Alias of `search`, matching the `list_studies` MCP tool. Sent together with `search`, both must be equal.
+        schema:
+          type: string
+          maxLength: 200
+      - in: query
+        name: limit
+        required: false
+        description: Max studies per page.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+      - in: query
+        name: offset
+        required: false
+        description: Number of studies to skip.
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
     post:
-      parameters: []
       responses:
         '201':
           description: Study created.
@@ -1278,28 +1983,95 @@ paths:
                 isLinkSharingEnabled:
                   type: boolean
                   description: Enable public link sharing for the Study and its attached Audiences/Minds.
+      parameters: []
 components:
   schemas:
-    StudyMind:
+    StudyOutputData:
       type: object
       required:
-      - id
-      - name
+      - title
+      - type
+      - audiences
       properties:
+        title:
+          type: string
+        type:
+          type: string
+          enum:
+          - scale
+          - categorical
+          - multiselect
+          - qualitative
+        classification:
+          $ref: '#/components/schemas/StudyQuestionClassification'
+        ranking:
+          type: object
+          description: 'Present for a ranking question: each option''s mean position (1 = first) and first-place count, best first.'
+          required:
+          - respondents
+          - options
+          properties:
+            respondents:
+              type: integer
+              minimum: 0
+            options:
+              type: array
+              items:
+                type: object
+                required:
+                - option
+                - meanRank
+                - firstCount
+                properties:
+                  option:
+                    type: string
+                  meanRank:
+                    type: number
+                  firstCount:
+                    type: integer
+                    minimum: 0
+        categoryCodebook:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyCategoryCodebookEntry'
+        audiences:
+          type: array
+          deprecated: true
+          description: Deprecated alias for audiences.
+          items:
+            $ref: '#/components/schemas/StudyOutputAudience'
+    StudyAskErrorEvent:
+      type: object
+      required:
+      - type
+      - statusCode
+      - statusMessage
+      description: 'Last event of a stream that failed after it opened. Carries what the HTTP error response would have: an error before the stream opens is still returned as that HTTP status.'
+      properties:
+        type:
+          type: string
+          enum:
+          - error
+        statusCode:
+          type: integer
+          description: HTTP status the error corresponds to, e.g. 422 for an attachment that could not be processed.
+        statusMessage:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+          description: 'Error details, e.g. `{ errorCode: "ATTACHMENT_PROCESSING_FAILED", fileNames: [...] }`.'
+    StudyKeywordContext:
+      type: object
+      properties:
+        label:
+          type: string
+          description: Keyword or topic label.
+        url:
+          type: string
+          description: Optional source URL for the keyword.
         id:
           type: string
-          format: uuid
-        name:
-          type: string
-        discipline:
-          type:
-          - string
-          - 'null'
-        profileImageUrl:
-          type:
-          - string
-          - 'null'
-          format: uri
     StudyCitationProvenance:
       type: object
       required:
@@ -1335,83 +2107,213 @@ components:
           - timeout
           - error
           description: 'Only when status is unavailable: why no sources could be attributed.'
-    StudyAskRequest:
-      type: object
-      required:
-      - question
-      properties:
-        question:
-          type: string
-          minLength: 1
-          description: Research question to ask the study.
-        sourcePolicy:
-          type: string
-          enum:
-          - auto
-          - knowledge_only
-          default: auto
-          description: knowledge_only forbids live/request sources, requires each Mind's processed knowledge, and fails closed when retrieval is empty.
-        historyMode:
-          type: string
-          enum:
-          - last5
-          - followup_only
-          - none
-          default: none
-          description: How much of each Mind's own prior answers this question carries. Defaults to none. Use last5 when a respondent's coherence across items is the deliverable.
-        audienceIds:
-          type: array
-          description: Optional subset of attached audience UUIDs to ask. Defaults to all audiences on the study.
-          items:
+    FixedInstrumentQuestions:
+      type: array
+      minItems: 1
+      maxItems: 200
+      description: 'Fixed instrument. When present the planner is bypassed: every question is stored verbatim (whitespace collapsed), in this order, with exactly this response contract, except that a question sent as qualitative (or as a choice without options) whose own text lists its answers is stored as the choice question that text states: single choice, multiselect or ranking. Use `edits` on the saved revision to set it back to qualitative. Consecutive questions sharing a module label form one module. Cannot be combined with refinement, answers, questionResponses, or suggestQuestionStimuli. Repeated question texts or colliding ids are rejected.'
+      items:
+        type: object
+        required:
+        - text
+        - response
+        additionalProperties: false
+        properties:
+          id:
             type: string
-            format: uuid
-        attachments:
-          type: array
-          description: Files or images to process once and include as context for every Mind in the Study.
-          items:
-            $ref: '#/components/schemas/StudyAttachment'
-        links:
-          type: array
-          description: Web links to fetch and summarize for context.
-          items:
-            $ref: '#/components/schemas/StudyContextLink'
-        keywords:
-          type: array
-          description: Keyword/source pairs to fetch and summarize for context.
-          items:
-            $ref: '#/components/schemas/StudyKeywordContext'
-        model:
-          type: string
-          description: Optional per-request model override. Must be sent together with `provider`.
-        provider:
-          type: string
-          enum:
-          - openai
-          - anthropic
-          - google
-          description: Provider for the model override. Must be sent together with `model`.
-        disableQuestionClassifier:
-          type: boolean
-          default: false
-          description: Skip automatic scale/categorical/multiselect/qualitative classification.
-        responseMode:
-          type: string
-          enum:
-          - stream
-          - queued
-          default: stream
-          description: Use queued to persist the question and return immediately while durable workers generate the answers.
-        responseForm:
-          type: string
-          enum:
-          - concise
-          - standard
-          - expanded
-          description: 'How long and how shaped each answer should be, for qualitative questions: `concise` one short message (5-20 words), `standard` 1-3 sentences (25-90 words), `expanded` 2-5 sentences (70-180 words). Omit to let the question decide, which is the existing behaviour. An authored form outranks the phrasing of the question, so a fixed instrument keeps its exact wording. Ignored for scale, categorical and multiselect questions, which are shaped by their answer space.'
-        clientRequestId:
-          type: string
-          format: uuid
-          description: Optional idempotency key for queued submissions.
+            maxLength: 80
+            description: Stable item id; lower-cased to a slug. Defaults to q<position>.
+          text:
+            type: string
+            maxLength: 2000
+            description: 'Exact respondent-visible question text, including any anchors or labels. Skip and filter instructions ("No -> go to Q12", "only if Q3 = Yes") do not belong in the text either: transcribe each as askIf. A jump from an answer of item G to item N gives every item between G and N answerNotIn [that answer]; a filter gives answerIn. Tell the person about any instruction you cannot map to exact items and options instead of guessing it.'
+          module:
+            type: string
+            maxLength: 200
+            description: Optional module (battery) label; consecutive questions with the same label are grouped.
+          response:
+            oneOf:
+            - type: object
+              required:
+              - type
+              additionalProperties: false
+              properties:
+                type:
+                  type: string
+                  enum:
+                  - qualitative
+            - type: object
+              required:
+              - type
+              - categoricalOptions
+              additionalProperties: false
+              properties:
+                type:
+                  type: string
+                  enum:
+                  - categorical
+                categoricalOptions:
+                  type: array
+                  minItems: 2
+                  maxItems: 100
+                  uniqueItems: true
+                  items:
+                    type: string
+                    minLength: 1
+                  description: Predefined answer choices shown to every Mind.
+            - type: object
+              required:
+              - type
+              - categoricalOptions
+              additionalProperties: false
+              properties:
+                type:
+                  type: string
+                  enum:
+                  - multiselect
+                categoricalOptions:
+                  type: array
+                  minItems: 2
+                  maxItems: 100
+                  uniqueItems: true
+                  items:
+                    type: string
+                    minLength: 1
+                  description: Predefined answers from which each Mind may select multiple choices.
+                maxSelections:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  description: Maximum choices each respondent may select.
+            - type: object
+              required:
+              - type
+              - categoricalOptions
+              additionalProperties: false
+              properties:
+                type:
+                  type: string
+                  enum:
+                  - ranking
+                categoricalOptions:
+                  type: array
+                  minItems: 2
+                  maxItems: 100
+                  uniqueItems: true
+                  items:
+                    type: string
+                    minLength: 1
+                  description: Predefined answers every Mind puts in order, first to last. Results report first places as the distribution plus each option's mean rank.
+            - type: object
+              required:
+              - type
+              additionalProperties: false
+              properties:
+                type:
+                  type: string
+                  enum:
+                  - scale
+                unit:
+                  type: object
+                  properties:
+                    kind:
+                      type: string
+                      enum:
+                      - currency
+                      - percentage
+                      - duration
+                      - length
+                      - mass
+                      - volume
+                      - custom
+                    code:
+                      type: string
+                      minLength: 1
+                      maxLength: 80
+                      description: ISO 4217 currency code (EUR, USD); % for percentage; singular Intl unit identifier (hour, meter, kilogram, liter) for measurements; or a label of up to 80 characters for custom. Selecting a unit does not convert numbers or impose a range.
+                  required:
+                  - kind
+                  - code
+                  additionalProperties: false
+                  description: Unit of a numeric (scale) answer. Values stay plain numbers; result surfaces display them in this unit.
+                scalePoints:
+                  type: array
+                  minItems: 2
+                  maxItems: 100
+                  description: Exhaustive allowed numeric scale answers in authored order. Preserve literal labels and values; do not add intermediate points.
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - label
+                    - value
+                    properties:
+                      label:
+                        type: string
+                        minLength: 1
+                      value:
+                        type: number
+                scaleRange:
+                  type: array
+                  minItems: 2
+                  maxItems: 2
+                  items:
+                    type: number
+                  description: Optional inclusive finite numeric response bounds as [minimum, maximum]. Omit when the numeric response has no authored bounds.
+            description: Confirmed response contract for a planned question.
+          askIf:
+            type: object
+            additionalProperties: false
+            required:
+            - questionId
+            oneOf:
+            - required:
+              - answerIn
+            - required:
+              - answerNotIn
+            - required:
+              - categoryIn
+            - required:
+              - categoryNotIn
+            description: 'Ask this question only of respondents whose own answer to an earlier question matched. Give exactly one of: answerIn (asked when the respondent chose any of these options) or answerNotIn (asked when it chose none of them) for an earlier categorical or multiselect question, using its option labels exactly; or categoryIn / categoryNotIn for an earlier open (qualitative) question, which codes each respondent''s own answer into one of the categories named for that question (one coding frame per question, at most 12 categories) after it has been answered and before this question runs. An answer that fits none of the categories counts as none of them. Scale and ranking questions cannot gate. Respondents not asked are recorded as not asked and excluded from this question''s results.'
+            properties:
+              questionId:
+                type: string
+                minLength: 1
+                maxLength: 80
+                description: Id of the earlier question whose answer decides.
+              answerIn:
+                type: array
+                minItems: 1
+                maxItems: 100
+                items:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+              answerNotIn:
+                type: array
+                minItems: 1
+                maxItems: 100
+                items:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+              categoryIn:
+                type: array
+                minItems: 1
+                maxItems: 100
+                items:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+              categoryNotIn:
+                type: array
+                minItems: 1
+                maxItems: 100
+                items:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
     StudyAnswerProvenance:
       type: object
       required:
@@ -1478,136 +2380,60 @@ components:
           type: string
           enum:
           - study-answer-provenance-v1
-    StudyAudience:
+    StudyExportRequest:
       type: object
-      required:
-      - id
-      - name
-      - minds
       properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        minds:
-          type: array
-          items:
-            $ref: '#/components/schemas/StudyMind'
-    StudyOutputAudience:
-      type: object
-      required:
-      - audience
-      - value
-      - answers
-      properties:
-        audience:
-          type: string
-          deprecated: true
-          description: Deprecated alias for audience.
-        value:
-          type: string
-        alignmentScore:
-          type: integer
-          minimum: 0
-          maximum: 100
-        answers:
-          type: array
-          items:
-            $ref: '#/components/schemas/StudyOutputAnswer'
-    StudyAskDoneEvent:
-      type: object
-      required:
-      - type
-      properties:
-        type:
+        kind:
           type: string
           enum:
-          - done
-    StudyMessage:
+          - executive_brief
+          - full_report
+          - raw_data
+          default: full_report
+        format:
+          type: string
+          enum:
+          - pdf
+          - md
+          - docx
+          - pptx
+          - csv
+          - xls
+          - sav
+          default: md
+        length:
+          type: string
+          enum:
+          - short
+          - standard
+          - detailed
+          default: standard
+        force:
+          type: boolean
+          default: false
+        scheduledRunId:
+          type: string
+          format: uuid
+    StudyAttachment:
       type: object
-      required:
-      - id
-      - role
-      - content
-      - metadata
-      - createdAt
       properties:
-        id:
+        url:
           type: string
-        role:
+          description: External URL for the uploaded or remote file.
+        path:
           type: string
-        content:
+          description: Storage path for an uploaded file.
+        name:
           type: string
-        metadata: {}
-        createdAt:
+        type:
           type: string
-          format: date-time
-    StudyExportJobResponse:
-      type: object
-      required:
-      - data
-      properties:
-        data:
-          type: object
-          required:
-          - kind
-          - format
-          - jobId
-          - status
-          properties:
-            kind:
-              type: string
-              enum:
-              - executive_brief
-              - full_report
-              - raw_data
-            format:
-              type: string
-              enum:
-              - pdf
-              - md
-              - docx
-              - pptx
-              - csv
-              - xls
-              - sav
-            jobId:
-              type: string
-            status:
-              type: string
-              enum:
-              - queued
-    StudyAskSseEvent:
-      oneOf:
-      - $ref: '#/components/schemas/StudyAskStartEvent'
-      - $ref: '#/components/schemas/StudyAskClassificationEvent'
-      - $ref: '#/components/schemas/StudyAskAnswerEvent'
-      - $ref: '#/components/schemas/StudyAskAggregatingEvent'
-      - $ref: '#/components/schemas/StudyAskResultEvent'
-      - $ref: '#/components/schemas/StudyAskDoneEvent'
-    StudyCategoryCodebookEntry:
-      type: object
-      required:
-      - label
-      - originalLabels
-      - count
-      properties:
-        label:
-          type: string
-        originalLabels:
-          type: array
-          items:
-            type: string
-        count:
-          type: integer
-          minimum: 0
+          description: MIME type when known.
     StudyCreated:
       type: object
       required:
       - id
       - name
-      - flowMode
+      - studyMode
       - createdAt
       - isLinkSharingEnabled
       - publicShareId
@@ -1636,12 +2462,28 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/StudyAudience'
+    Pagination:
+      type: object
+      required:
+      - total
+      - limit
+      - offset
+      properties:
+        total:
+          type: integer
+          description: Total matching rows.
+        limit:
+          type: integer
+          description: Page size requested.
+        offset:
+          type: integer
+          description: Number of rows skipped.
     StudySummary:
       type: object
       required:
       - id
       - name
-      - flowMode
+      - studyMode
       - createdAt
       - updatedAt
       - messageCount
@@ -1665,8 +2507,15 @@ components:
           format: date-time
         messageCount:
           type: integer
+          description: Number of stored messages across all roles, including user, assistant and system messages.
+        isPublic:
+          type: boolean
+          description: Whether the Study is publicly accessible.
         isLinkSharingEnabled:
           type: boolean
+        isSharedWithTeam:
+          type: boolean
+          description: Whether the owner shared the Study with their team. Change it with PUT /api/v1/studies/{studyId}/sharing.
         publicShareId:
           type:
           - string
@@ -1711,6 +2560,18 @@ components:
                       - string
                       - 'null'
                       format: uri
+    StudyAskClassificationEvent:
+      type: object
+      required:
+      - type
+      - classification
+      properties:
+        type:
+          type: string
+          enum:
+          - classification
+        classification:
+          $ref: '#/components/schemas/StudyQuestionClassification'
     StudyAskAnswerEvent:
       type: object
       required:
@@ -1745,22 +2606,103 @@ components:
           type: string
         answer:
           type: string
-    Pagination:
+        responseStatus:
+          type: string
+          enum:
+          - declined
+          description: Present when the Mind declined because it was not shown the material the question asks about; answer is its own sentence.
+    ResearchQuestionCondition:
+      type: object
+      additionalProperties: false
+      required:
+      - questionId
+      oneOf:
+      - required:
+        - answerIn
+      - required:
+        - answerNotIn
+      - required:
+        - categoryIn
+      - required:
+        - categoryNotIn
+      description: 'Ask this question only of respondents whose own answer to an earlier question matched. Give exactly one of: answerIn (asked when the respondent chose any of these options) or answerNotIn (asked when it chose none of them) for an earlier categorical or multiselect question, using its option labels exactly; or categoryIn / categoryNotIn for an earlier open (qualitative) question, which codes each respondent''s own answer into one of the categories named for that question (one coding frame per question, at most 12 categories) after it has been answered and before this question runs. An answer that fits none of the categories counts as none of them. Scale and ranking questions cannot gate. Respondents not asked are recorded as not asked and excluded from this question''s results.'
+      properties:
+        questionId:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Id of the earlier question whose answer decides.
+        answerIn:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        answerNotIn:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        categoryIn:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        categoryNotIn:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+    StudyAskAggregatingEvent:
       type: object
       required:
-      - total
-      - limit
-      - offset
+      - type
       properties:
+        type:
+          type: string
+          enum:
+          - aggregating
+    StudyAskStartEvent:
+      type: object
+      required:
+      - type
+      - total
+      properties:
+        type:
+          type: string
+          enum:
+          - start
         total:
           type: integer
-          description: Total matching rows.
-        limit:
-          type: integer
-          description: Page size requested.
-        offset:
-          type: integer
-          description: Number of rows skipped.
+          description: Total number of minds that will answer.
+    StudyAskResultEvent:
+      type: object
+      required:
+      - type
+      - outputData
+      - outputType
+      properties:
+        type:
+          type: string
+          enum:
+          - result
+        outputData:
+          $ref: '#/components/schemas/StudyOutputData'
+        outputType:
+          type: string
+          enum:
+          - bar
     StudyExportStatusResponse:
       type: object
       required:
@@ -1821,230 +2763,26 @@ components:
               - sav
             sourceVersion:
               type: string
-    StudyExportRequest:
-      type: object
-      properties:
-        kind:
-          type: string
-          enum:
-          - executive_brief
-          - full_report
-          - raw_data
-          default: full_report
-        format:
-          type: string
-          enum:
-          - pdf
-          - md
-          - docx
-          - pptx
-          - csv
-          - xls
-          - sav
-          default: md
-        length:
-          type: string
-          enum:
-          - short
-          - standard
-          - detailed
-          default: standard
-        force:
-          type: boolean
-          default: false
-        scheduledRunId:
-          type: string
-          format: uuid
-    StudyOutputData:
+    StudyMind:
       type: object
       required:
-      - title
-      - type
-      - audiences
+      - id
+      - name
       properties:
-        title:
-          type: string
-        type:
-          type: string
-          enum:
-          - scale
-          - categorical
-          - multiselect
-          - qualitative
-        classification:
-          $ref: '#/components/schemas/StudyQuestionClassification'
-        categoryCodebook:
-          type: array
-          items:
-            $ref: '#/components/schemas/StudyCategoryCodebookEntry'
-        audiences:
-          type: array
-          deprecated: true
-          description: Deprecated alias for audiences.
-          items:
-            $ref: '#/components/schemas/StudyOutputAudience'
-    StudyContextLink:
-      type: object
-      properties:
-        label:
-          type: string
-          description: URL or display label.
-        url:
-          type: string
-          description: URL to fetch when separate from `label`.
         id:
           type: string
-    StudyOutputAnswer:
-      type: object
-      required:
-      - value
-      - persona
-      - message
-      properties:
-        value:
-          type: string
-        rawValue:
-          type: string
-        persona:
+          format: uuid
+        name:
           type: string
         discipline:
           type:
           - string
           - 'null'
-        message:
-          type: string
-        imageUrl:
+        profileImageUrl:
           type:
           - string
           - 'null'
-        reliabilityScore:
-          type: integer
-          minimum: 0
-          maximum: 100
-        citationSources:
-          type: array
-          description: Claim-level sources referenced by zero-based [N] markers in message.
-          items:
-            $ref: '#/components/schemas/StudyCitationSource'
-        citationProvenance:
-          $ref: '#/components/schemas/StudyCitationProvenance'
-        answerProvenance:
-          $ref: '#/components/schemas/StudyAnswerProvenance'
-    StudyAttachment:
-      type: object
-      properties:
-        url:
-          type: string
-          description: External URL for the uploaded or remote file.
-        path:
-          type: string
-          description: Storage path for an uploaded file.
-        name:
-          type: string
-        type:
-          type: string
-          description: MIME type when known.
-    StudyDetail:
-      type: object
-      required:
-      - id
-      - name
-      - flowMode
-      - createdAt
-      - updatedAt
-      - isLinkSharingEnabled
-      - publicShareId
-      - audiences
-      - messages
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        studyMode:
-          type: string
-          enum:
-          - study
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        isLinkSharingEnabled:
-          type: boolean
-        publicShareId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        audiences:
-          type: array
-          items:
-            $ref: '#/components/schemas/StudyAudience'
-        messages:
-          type: array
-          items:
-            $ref: '#/components/schemas/StudyMessage'
-    StudyAskResultEvent:
-      type: object
-      required:
-      - type
-      - outputData
-      - outputType
-      properties:
-        type:
-          type: string
-          enum:
-          - result
-        outputData:
-          $ref: '#/components/schemas/StudyOutputData'
-        outputType:
-          type: string
-          enum:
-          - bar
-    StudyAskAggregatingEvent:
-      type: object
-      required:
-      - type
-      properties:
-        type:
-          type: string
-          enum:
-          - aggregating
-    StudyQuestionClassification:
-      type: object
-      required:
-      - type
-      properties:
-        type:
-          type: string
-          enum:
-          - scale
-          - categorical
-          - multiselect
-          - qualitative
-        scaleRange:
-          type: array
-          minItems: 2
-          maxItems: 2
-          items:
-            type: number
-        options:
-          type: array
-          items:
-            type: string
-        responseMode:
-          type: string
-          enum:
-          - everyday
-          - standard_qualitative
-          - deliberative_values
-          - scale
-          - categorical
-          - factual_research
-          description: Answer-depth and grounding policy, orthogonal to the structured response type.
+          format: uri
     StudyCitationSource:
       type: object
       required:
@@ -2068,42 +2806,902 @@ components:
           - web
         similarity:
           type: number
-    StudyKeywordContext:
+    StudyExportJobResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          type: object
+          required:
+          - kind
+          - format
+          - jobId
+          - status
+          properties:
+            kind:
+              type: string
+              enum:
+              - executive_brief
+              - full_report
+              - raw_data
+            format:
+              type: string
+              enum:
+              - pdf
+              - md
+              - docx
+              - pptx
+              - csv
+              - xls
+              - sav
+            jobId:
+              type: string
+            status:
+              type: string
+              enum:
+              - queued
+    ResearchStudyPlan:
+      type: object
+      additionalProperties: true
+      description: Versioned research plan. Every question exposes its proposed or confirmed response contract.
+      properties:
+        version:
+          type: integer
+          enum:
+          - 1
+        executionPolicy:
+          type: object
+          additionalProperties: false
+          required:
+          - sourcePolicy
+          properties:
+            sourcePolicy:
+              type: string
+              enum:
+              - request_only
+              - auto
+              description: Frozen evidence policy for the confirmed run. Ordinary Studies use relevant Mind knowledge alongside the assigned stimulus. Historical and internal evaluation runs may carry a closed policy.
+            videoAnalysisStyle:
+              type: string
+              enum:
+              - record
+              - analyst
+              description: Register of the one video summary every Mind of this run reads. record (default) writes down the spoken script, the visible scenes and the on-screen text; analyst deliberately reproduces the pre-2026-09 prompt, which reads tone and intent and raises the panel's positive rating bias.
+            mindSourcePolicyOverrides:
+              type: array
+              maxItems: 2000
+              description: Deterministically ordered, checksum-lockable per-Mind experiment assignments. Unlisted Minds use sourcePolicy.
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                - mindId
+                - sourcePolicy
+                properties:
+                  mindId:
+                    type: string
+                    format: uuid
+                  sourcePolicy:
+                    type: string
+                    enum:
+                    - request_only
+                    - auto
+        modules:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            properties:
+              questions:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+                  properties:
+                    id:
+                      type: string
+                    text:
+                      type: string
+                    response:
+                      oneOf:
+                      - type: object
+                        required:
+                        - type
+                        additionalProperties: false
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                            - qualitative
+                      - type: object
+                        required:
+                        - type
+                        - categoricalOptions
+                        additionalProperties: false
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                            - categorical
+                          categoricalOptions:
+                            type: array
+                            minItems: 2
+                            maxItems: 100
+                            uniqueItems: true
+                            items:
+                              type: string
+                              minLength: 1
+                            description: Predefined answer choices shown to every Mind.
+                      - type: object
+                        required:
+                        - type
+                        - categoricalOptions
+                        additionalProperties: false
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                            - multiselect
+                          categoricalOptions:
+                            type: array
+                            minItems: 2
+                            maxItems: 100
+                            uniqueItems: true
+                            items:
+                              type: string
+                              minLength: 1
+                            description: Predefined answers from which each Mind may select multiple choices.
+                          maxSelections:
+                            type: integer
+                            minimum: 1
+                            maximum: 100
+                            description: Maximum choices each respondent may select.
+                      - type: object
+                        required:
+                        - type
+                        - categoricalOptions
+                        additionalProperties: false
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                            - ranking
+                          categoricalOptions:
+                            type: array
+                            minItems: 2
+                            maxItems: 100
+                            uniqueItems: true
+                            items:
+                              type: string
+                              minLength: 1
+                            description: Predefined answers every Mind puts in order, first to last. Results report first places as the distribution plus each option's mean rank.
+                      - type: object
+                        required:
+                        - type
+                        additionalProperties: false
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                            - scale
+                          unit:
+                            type: object
+                            properties:
+                              kind:
+                                type: string
+                                enum:
+                                - currency
+                                - percentage
+                                - duration
+                                - length
+                                - mass
+                                - volume
+                                - custom
+                              code:
+                                type: string
+                                minLength: 1
+                                maxLength: 80
+                                description: ISO 4217 currency code (EUR, USD); % for percentage; singular Intl unit identifier (hour, meter, kilogram, liter) for measurements; or a label of up to 80 characters for custom. Selecting a unit does not convert numbers or impose a range.
+                            required:
+                            - kind
+                            - code
+                            additionalProperties: false
+                            description: Unit of a numeric (scale) answer. Values stay plain numbers; result surfaces display them in this unit.
+                          scalePoints:
+                            type: array
+                            minItems: 2
+                            maxItems: 100
+                            description: Exhaustive allowed numeric scale answers in authored order. Preserve literal labels and values; do not add intermediate points.
+                            items:
+                              type: object
+                              additionalProperties: false
+                              required:
+                              - label
+                              - value
+                              properties:
+                                label:
+                                  type: string
+                                  minLength: 1
+                                value:
+                                  type: number
+                          scaleRange:
+                            type: array
+                            minItems: 2
+                            maxItems: 2
+                            items:
+                              type: number
+                            description: Optional inclusive finite numeric response bounds as [minimum, maximum]. Omit when the numeric response has no authored bounds.
+                      description: Confirmed response contract for a planned question.
+                    askIf:
+                      type: object
+                      additionalProperties: false
+                      required:
+                      - questionId
+                      oneOf:
+                      - required:
+                        - answerIn
+                      - required:
+                        - answerNotIn
+                      - required:
+                        - categoryIn
+                      - required:
+                        - categoryNotIn
+                      description: 'Ask this question only of respondents whose own answer to an earlier question matched. Give exactly one of: answerIn (asked when the respondent chose any of these options) or answerNotIn (asked when it chose none of them) for an earlier categorical or multiselect question, using its option labels exactly; or categoryIn / categoryNotIn for an earlier open (qualitative) question, which codes each respondent''s own answer into one of the categories named for that question (one coding frame per question, at most 12 categories) after it has been answered and before this question runs. An answer that fits none of the categories counts as none of them. Scale and ranking questions cannot gate. Respondents not asked are recorded as not asked and excluded from this question''s results.'
+                      properties:
+                        questionId:
+                          type: string
+                          minLength: 1
+                          maxLength: 80
+                          description: Id of the earlier question whose answer decides.
+                        answerIn:
+                          type: array
+                          minItems: 1
+                          maxItems: 100
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 500
+                        answerNotIn:
+                          type: array
+                          minItems: 1
+                          maxItems: 100
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 500
+                        categoryIn:
+                          type: array
+                          minItems: 1
+                          maxItems: 100
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 500
+                        categoryNotIn:
+                          type: array
+                          minItems: 1
+                          maxItems: 100
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 500
+                    attachmentIds:
+                      type: array
+                      uniqueItems: true
+                      items:
+                        type: string
+                      description: Durable Study-asset IDs assigned only to this question; [] means no assets. A question without attachmentIds receives every asset, and an asset no question lists is shown with every question instead of refusing the run.
+    StudyAnalytics:
+      type: object
+      additionalProperties: true
+      required:
+      - studyName
+      - totalAudiences
+      - totalMinds
+      - totalQuestions
+      - totalDataPoints
+      - questions
+      properties:
+        studyName:
+          type: string
+        locale:
+          type: string
+          description: 'Study display locale used to format values: the language of the Study''s confirmed research plan (studyLocale), else the stored Study locale, else en.'
+        totalAudiences:
+          type: integer
+          minimum: 0
+        totalMinds:
+          type: integer
+          minimum: 0
+          description: Total Minds across the Study's Audiences (legacy wire name).
+        totalQuestions:
+          type: integer
+          minimum: 0
+        totalDataPoints:
+          type: integer
+          minimum: 0
+        questions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            properties:
+              index:
+                type: integer
+                minimum: 1
+              title:
+                type: string
+              type:
+                type: string
+                enum:
+                - scale
+                - categorical
+                - multiselect
+                - qualitative
+              classification:
+                $ref: '#/components/schemas/StudyQuestionClassification'
+              stats:
+                type: object
+                additionalProperties: true
+        scaleQuestionRankings:
+          type: array
+          description: Scale questions ranked by overall mean, only among questions that share one scale (authored points, else range) and one unit. A missing unit and a missing range each form their own audience. A question alone on its measure has no ranking position and appears in no audience. Replaces the former single scaleQuestionRanking list, which compared means on different scales and units.
+          items:
+            type: object
+            required:
+            - scale
+            - questions
+            properties:
+              scale:
+                type: object
+                description: The shared scale. Empty for open numeric questions without authored bounds.
+                properties:
+                  range:
+                    type: array
+                    minItems: 2
+                    maxItems: 2
+                    items:
+                      type: number
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - label
+                      - value
+                      properties:
+                        label:
+                          type: string
+                        value:
+                          type: number
+              unit:
+                $ref: '#/components/schemas/NumericUnit'
+              questions:
+                type: array
+                minItems: 2
+                description: Highest mean first.
+                items:
+                  type: object
+                  required:
+                  - title
+                  - mean
+                  - sigma
+                  - signalStrength
+                  properties:
+                    title:
+                      type: string
+                    mean:
+                      type: number
+                    sigma:
+                      type: number
+                    signalStrength:
+                      type: string
+                      enum:
+                      - strong
+                      - moderate
+                      - weak
+    StudyAskDoneEvent:
+      type: object
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - done
+    StudyQuestionClassification:
+      type: object
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - scale
+          - categorical
+          - multiselect
+          - qualitative
+        scaleRange:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: number
+        unit:
+          $ref: '#/components/schemas/NumericUnit'
+        scalePoints:
+          type: array
+          description: 'Authored numeric answer mapping in order: each allowed value with its literal label.'
+          items:
+            type: object
+            required:
+            - label
+            - value
+            properties:
+              label:
+                type: string
+              value:
+                type: number
+        options:
+          type: array
+          items:
+            type: string
+        ranked:
+          type: boolean
+          description: True for a ranking question, which runs as a categorical choice over its first place plus each Mind's full order.
+        responseMode:
+          type: string
+          enum:
+          - everyday
+          - standard_qualitative
+          - deliberative_values
+          - scale
+          - categorical
+          - factual_research
+          description: Answer-depth and grounding policy, orthogonal to the structured response type.
+    StudyCategoryCodebookEntry:
+      type: object
+      required:
+      - label
+      - originalLabels
+      - count
+      properties:
+        label:
+          type: string
+        originalLabels:
+          type: array
+          items:
+            type: string
+        count:
+          type: integer
+          minimum: 0
+    StudyOutputAudience:
+      type: object
+      required:
+      - audience
+      - value
+      - answers
+      properties:
+        audience:
+          type: string
+          deprecated: true
+          description: Deprecated alias for audience.
+        value:
+          type: string
+        alignmentScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyOutputAnswer'
+        declinedAnswers:
+          type: array
+          description: Minds that declined because the question asks about material they were not shown (responseStatus declined, empty value, message is their own sentence). Outside answers, value, distribution and every count. Absent when nobody declined.
+          items:
+            $ref: '#/components/schemas/StudyOutputAnswer'
+    StudyAskSseEvent:
+      oneOf:
+      - $ref: '#/components/schemas/StudyAskStartEvent'
+      - $ref: '#/components/schemas/StudyAskClassificationEvent'
+      - $ref: '#/components/schemas/StudyAskAnswerEvent'
+      - $ref: '#/components/schemas/StudyAskAggregatingEvent'
+      - $ref: '#/components/schemas/StudyAskResultEvent'
+      - $ref: '#/components/schemas/StudyAskDoneEvent'
+      - $ref: '#/components/schemas/StudyAskErrorEvent'
+    StudyMessage:
+      type: object
+      required:
+      - id
+      - role
+      - content
+      - metadata
+      - createdAt
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+        content:
+          type: string
+        metadata: {}
+        createdAt:
+          type: string
+          format: date-time
+    StudyDetail:
+      type: object
+      required:
+      - id
+      - name
+      - studyMode
+      - createdAt
+      - updatedAt
+      - isLinkSharingEnabled
+      - publicShareId
+      - audiences
+      - messages
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        studyMode:
+          type: string
+          enum:
+          - study
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        isPublic:
+          type: boolean
+          description: Whether the Study is publicly accessible.
+        isLinkSharingEnabled:
+          type: boolean
+        isSharedWithTeam:
+          type: boolean
+          description: Whether the owner shared the Study with their team. Change it with PUT /api/v1/studies/{studyId}/sharing.
+        publicShareId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        audiences:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyAudience'
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyMessage'
+    NumericUnit:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - currency
+          - percentage
+          - duration
+          - length
+          - mass
+          - volume
+          - custom
+        code:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: ISO 4217 currency code (EUR, USD); % for percentage; singular Intl unit identifier (hour, meter, kilogram, liter) for measurements; or a label of up to 80 characters for custom. Selecting a unit does not convert numbers or impose a range.
+      required:
+      - kind
+      - code
+      additionalProperties: false
+      description: Unit of a numeric (scale) answer. Values stay plain numbers; result surfaces display them in this unit.
+    ResearchQuestionResponse:
+      oneOf:
+      - type: object
+        required:
+        - type
+        additionalProperties: false
+        properties:
+          type:
+            type: string
+            enum:
+            - qualitative
+      - type: object
+        required:
+        - type
+        - categoricalOptions
+        additionalProperties: false
+        properties:
+          type:
+            type: string
+            enum:
+            - categorical
+          categoricalOptions:
+            type: array
+            minItems: 2
+            maxItems: 100
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+            description: Predefined answer choices shown to every Mind.
+      - type: object
+        required:
+        - type
+        - categoricalOptions
+        additionalProperties: false
+        properties:
+          type:
+            type: string
+            enum:
+            - multiselect
+          categoricalOptions:
+            type: array
+            minItems: 2
+            maxItems: 100
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+            description: Predefined answers from which each Mind may select multiple choices.
+          maxSelections:
+            type: integer
+            minimum: 1
+            maximum: 100
+            description: Maximum choices each respondent may select.
+      - type: object
+        required:
+        - type
+        - categoricalOptions
+        additionalProperties: false
+        properties:
+          type:
+            type: string
+            enum:
+            - ranking
+          categoricalOptions:
+            type: array
+            minItems: 2
+            maxItems: 100
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+            description: Predefined answers every Mind puts in order, first to last. Results report first places as the distribution plus each option's mean rank.
+      - type: object
+        required:
+        - type
+        additionalProperties: false
+        properties:
+          type:
+            type: string
+            enum:
+            - scale
+          unit:
+            type: object
+            properties:
+              kind:
+                type: string
+                enum:
+                - currency
+                - percentage
+                - duration
+                - length
+                - mass
+                - volume
+                - custom
+              code:
+                type: string
+                minLength: 1
+                maxLength: 80
+                description: ISO 4217 currency code (EUR, USD); % for percentage; singular Intl unit identifier (hour, meter, kilogram, liter) for measurements; or a label of up to 80 characters for custom. Selecting a unit does not convert numbers or impose a range.
+            required:
+            - kind
+            - code
+            additionalProperties: false
+            description: Unit of a numeric (scale) answer. Values stay plain numbers; result surfaces display them in this unit.
+          scalePoints:
+            type: array
+            minItems: 2
+            maxItems: 100
+            description: Exhaustive allowed numeric scale answers in authored order. Preserve literal labels and values; do not add intermediate points.
+            items:
+              type: object
+              additionalProperties: false
+              required:
+              - label
+              - value
+              properties:
+                label:
+                  type: string
+                  minLength: 1
+                value:
+                  type: number
+          scaleRange:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: number
+            description: Optional inclusive finite numeric response bounds as [minimum, maximum]. Omit when the numeric response has no authored bounds.
+      description: Confirmed response contract for a planned question.
+    StudyAudience:
+      type: object
+      required:
+      - id
+      - name
+      - minds
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        minds:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyMind'
+    StudyAskRequest:
+      type: object
+      required:
+      - question
+      properties:
+        question:
+          type: string
+          minLength: 1
+          description: Research question to ask the study.
+        sourcePolicy:
+          type: string
+          enum:
+          - auto
+          - knowledge_only
+          default: auto
+          description: knowledge_only forbids live/request sources, requires each Mind's processed knowledge, and fails closed when retrieval is empty.
+        historyMode:
+          type: string
+          enum:
+          - last5
+          - followup_only
+          - none
+          default: none
+          description: How much of each Mind's own prior answers this question carries. Defaults to none. Use last5 when a respondent's coherence across items is the deliverable.
+        audienceIds:
+          type: array
+          description: Optional subset of attached audience UUIDs to ask. Defaults to all audiences on the study.
+          items:
+            type: string
+            format: uuid
+        textAttachments:
+          type: array
+          description: 'Pasted material the question is about (a newsletter, an email, a concept text), sent beside the question instead of inside it. Each entry is stored as a Markdown file in your uploads and processed like an entry of `attachments`; on a queued ask, respondents read the documents the run reads as material to react to. Counts toward the attachment limit. Rejected with `sourcePolicy: knowledge_only`.'
+          items:
+            type: object
+            required:
+            - text
+            additionalProperties: false
+            properties:
+              name:
+                type: string
+                maxLength: 200
+                description: File name for the stored Markdown file.
+              text:
+                type: string
+                minLength: 1
+                description: The pasted material, verbatim.
+        attachments:
+          type: array
+          description: Files or images to process once and include as context for every Mind in the Study. Workspace uploads require ownership, a valid chat-file signature or shared Study context access. Remote HTTP(S) URLs are fetched with their own access token; knowing a storage path does not authorize renewal.
+          items:
+            $ref: '#/components/schemas/StudyAttachment'
+        links:
+          type: array
+          description: Web links to fetch and summarize for context.
+          items:
+            $ref: '#/components/schemas/StudyContextLink'
+        keywords:
+          type: array
+          description: Keyword/source pairs to fetch and summarize for context.
+          items:
+            $ref: '#/components/schemas/StudyKeywordContext'
+        model:
+          type: string
+          description: Optional per-request model override. Must be sent together with `provider`.
+        provider:
+          type: string
+          enum:
+          - openai
+          - anthropic
+          - google
+          description: Provider for the model override. Must be sent together with `model`.
+        disableQuestionClassifier:
+          type: boolean
+          default: false
+          description: Skip automatic scale/categorical/multiselect/qualitative classification.
+        responseMode:
+          type: string
+          enum:
+          - stream
+          - queued
+          description: Use queued to persist the question and return immediately while durable workers generate the answers. Queued asks support sourcePolicy auto; use the durable runs endpoint for knowledge_only or model connections. When omitted, the ask streams; while Minds of the Study are still training it is queued instead and answers 202 with the queued receipt (sourcePolicy auto). An explicit `stream` always streams, waiting with the stream open (up to 9 minutes) until those Minds are ready.
+        responseForm:
+          type: string
+          enum:
+          - concise
+          - standard
+          - expanded
+          description: 'How long and how shaped each answer should be, for qualitative questions: `concise` one short message (5-20 words), `standard` 1-3 sentences (25-90 words), `expanded` 2-5 sentences (70-180 words). Omit to let the question decide, which is the existing behaviour. An authored form outranks the phrasing of the question, so a fixed instrument keeps its exact wording. Ignored for scale, categorical and multiselect questions, which are shaped by their answer space.'
+        clientRequestId:
+          type: string
+          format: uuid
+          description: Optional idempotency key for queued submissions.
+    StudyOutputAnswer:
+      type: object
+      required:
+      - value
+      - persona
+      - message
+      properties:
+        value:
+          type: string
+        rawValue:
+          type: string
+        rankedValues:
+          type: array
+          items:
+            type: string
+          description: 'Ranking questions: this Mind''s full order, first place first (value is the first place).'
+        persona:
+          type: string
+        discipline:
+          type:
+          - string
+          - 'null'
+        message:
+          type: string
+          description: The Mind's response of record. Quote renderedVerbatim when present.
+        renderedVerbatim:
+          type: string
+          description: Validated display wording of message, carrying the same [N] citation markers as message. Present when a validated display rewrite exists; the app, exports and MCP show it instead of message. Structured fields never change.
+        imageUrl:
+          type:
+          - string
+          - 'null'
+        reliabilityScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+        citationSources:
+          type: array
+          description: Claim-level sources referenced by zero-based [N] markers in message and renderedVerbatim.
+          items:
+            $ref: '#/components/schemas/StudyCitationSource'
+        citationProvenance:
+          $ref: '#/components/schemas/StudyCitationProvenance'
+        answerProvenance:
+          $ref: '#/components/schemas/StudyAnswerProvenance'
+        responseStatus:
+          type: string
+          enum:
+          - declined
+          description: Only on declinedAnswers entries.
+    StudyContextLink:
       type: object
       properties:
         label:
           type: string
-          description: Keyword or topic label.
+          description: URL or display label.
         url:
           type: string
-          description: Optional source URL for the keyword.
+          description: URL to fetch when separate from `label`.
         id:
           type: string
-    StudyAskStartEvent:
-      type: object
-      required:
-      - type
-      - total
-      properties:
-        type:
-          type: string
-          enum:
-          - start
-        total:
-          type: integer
-          description: Total number of minds that will answer.
-    StudyAskClassificationEvent:
-      type: object
-      required:
-      - type
-      - classification
-      properties:
-        type:
-          type: string
-          enum:
-          - classification
-        classification:
-          $ref: '#/components/schemas/StudyQuestionClassification'
   securitySchemes:
     ApiKeyAuth:
       type: http

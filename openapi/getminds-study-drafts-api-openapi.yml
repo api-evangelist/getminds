@@ -15,13 +15,6 @@ tags:
 paths:
   /api/v1/study-drafts/{id}:
     delete:
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
       responses:
         '204':
           description: Study draft deleted.
@@ -29,13 +22,14 @@ paths:
           description: Unauthorized.
         '404':
           description: Study draft not found.
+        '500':
+          description: Internal server error.
       operationId: deleteStudyDraft
       summary: Delete a Study draft
       tags:
       - Study Drafts
       security:
       - ApiKeyAuth: []
-    get:
       parameters:
       - in: path
         name: id
@@ -43,6 +37,7 @@ paths:
         schema:
           type: string
           format: uuid
+    get:
       responses:
         '200':
           description: Owned Study draft.
@@ -59,13 +54,14 @@ paths:
           description: Unauthorized.
         '404':
           description: Study draft not found.
+        '500':
+          description: Internal server error.
       operationId: getStudyDraft
       summary: Get a Study draft
       tags:
       - Study Drafts
       security:
       - ApiKeyAuth: []
-    patch:
       parameters:
       - in: path
         name: id
@@ -73,6 +69,7 @@ paths:
         schema:
           type: string
           format: uuid
+    patch:
       responses:
         '200':
           description: Updated Study draft.
@@ -85,6 +82,8 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/StudyDraft'
+        '400':
+          description: Malformed JSON or invalid input.
         '401':
           description: Unauthorized.
         '404':
@@ -92,14 +91,23 @@ paths:
         '409':
           description: Stale revision or consumed draft.
         '413':
-          description: Payload too large.
+          description: Request exceeds 1 MiB or payload exceeds 512 KiB.
+        '500':
+          description: Internal server error.
       operationId: updateStudyDraft
       summary: Update a Study draft
-      description: Save an exact planning snapshot using optimistic revision compare-and-swap. A successful update increments revision.
+      description: Save an exact planning snapshot using optimistic revision compare-and-swap. A changed snapshot increments revision and returns the snapshot written by that update; an identical snapshot preserves revision and updatedAt. JSON requests are limited to 1 MiB and the versioned payload to 512 KiB. Responses are private and not cached.
       tags:
       - Study Drafts
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -125,6 +133,28 @@ paths:
                   $ref: '#/components/schemas/StudyDraftPayload'
   /api/v1/study-drafts/{id}/consume:
     post:
+      responses:
+        '200':
+          description: Consumed Study draft.
+        '400':
+          description: Malformed JSON or invalid input.
+        '401':
+          description: Unauthorized.
+        '404':
+          description: Study draft not found.
+        '409':
+          description: Stale revision.
+        '413':
+          description: Request exceeds 4 KiB.
+        '500':
+          description: Internal server error.
+      operationId: consumeStudyDraft
+      summary: Consume a Study draft after launch
+      description: Idempotently closes a draft after its Study crosses the durable execution boundary. The consumed tombstone prevents delayed clients from recreating the draft. Requires JSON up to 4 KiB. Responses are private and not cached.
+      tags:
+      - Study Drafts
+      security:
+      - ApiKeyAuth: []
       parameters:
       - in: path
         name: id
@@ -132,22 +162,6 @@ paths:
         schema:
           type: string
           format: uuid
-      responses:
-        '200':
-          description: Consumed Study draft.
-        '401':
-          description: Unauthorized.
-        '404':
-          description: Study draft not found.
-        '409':
-          description: Stale revision.
-      operationId: consumeStudyDraft
-      summary: Consume a Study draft after launch
-      description: Idempotently closes a draft after its Study crosses the durable execution boundary. The consumed tombstone prevents delayed clients from recreating the draft.
-      tags:
-      - Study Drafts
-      security:
-      - ApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -165,9 +179,65 @@ paths:
                   - string
                   - 'null'
                   format: uuid
+  /api/v1/study-drafts/{id}/read-source:
+    post:
+      responses:
+        '200':
+          description: Fresh reading with preserved edits; unresolved settings require confirmation.
+        '401':
+          description: Unauthorized.
+        '404':
+          description: Study draft not found.
+        '409':
+          description: Draft changed or cannot be edited.
+        '422':
+          description: Source cannot be verified; the saved review is unchanged.
+        '429':
+          description: Rate limited.
+        '500':
+          description: Reading failed; retry without losing saved edits.
+      operationId: rereadStudyDraftSource
+      summary: Reread the saved source of an owned Study draft
+      tags:
+      - Study Drafts
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              anyOf:
+              - required:
+                - expectedRevision
+              - required:
+                - operationId
+                properties:
+                  background:
+                    enum:
+                    - false
+              properties:
+                expectedRevision:
+                  type: integer
+                  minimum: 1
+                background:
+                  type: boolean
+                  description: Prepare the reading durably and return an operation id.
+                operationId:
+                  type: string
+                  format: uuid
+                  description: Resume the same import; without background=true, observe and commit its finished reading.
   /api/v1/study-drafts:
     get:
-      parameters: []
       responses:
         '200':
           description: Active Study drafts.
@@ -177,22 +247,68 @@ paths:
                 type: object
                 required:
                 - data
+                - pagination
                 properties:
                   data:
                     type: array
                     items:
                       $ref: '#/components/schemas/StudyDraft'
+                  pagination:
+                    type: object
+                    required:
+                    - total
+                    - limit
+                    - offset
+                    properties:
+                      total:
+                        type: integer
+                        description: Active drafts matching the search.
+                      limit:
+                        type:
+                        - integer
+                        - 'null'
+                        description: Page size requested; null when every match is returned.
+                      offset:
+                        type: integer
+                        description: Number of matching drafts skipped.
+        '400':
+          description: Invalid search, limit or offset.
         '401':
           description: Unauthorized.
+        '500':
+          description: Internal server error.
       operationId: listStudyDrafts
       summary: List active Study drafts
-      description: List only draft and starting Study drafts owned by the authenticated user, newest first.
+      description: List only draft and starting Study drafts owned by the authenticated user, newest first. search filters by name; limit and offset page the result (omit limit to list every active draft).
       tags:
       - Study Drafts
       security:
       - ApiKeyAuth: []
+      parameters:
+      - in: query
+        name: search
+        required: false
+        description: Case-insensitive substring of the draft name (at most 200 characters).
+        schema:
+          type: string
+          maxLength: 200
+      - in: query
+        name: limit
+        required: false
+        description: Drafts per page. Omit to list every active draft.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      - in: query
+        name: offset
+        required: false
+        description: Number of matching drafts to skip.
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
     post:
-      parameters: []
       responses:
         '201':
           description: Study draft created.
@@ -205,15 +321,19 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/StudyDraft'
+        '400':
+          description: Malformed JSON or invalid draft input.
         '401':
           description: Unauthorized.
         '409':
           description: The supplied draft ID already exists.
         '413':
-          description: The versioned payload exceeds the allowed size.
+          description: Request exceeds 1 MiB or the versioned payload exceeds 512 KiB.
+        '500':
+          description: Internal server error.
       operationId: createStudyDraft
       summary: Create a durable Study draft
-      description: Create a resumable Quick or Custom Study planning snapshot. This does not start research.
+      description: Create a resumable Quick or Custom Study planning snapshot. This does not start research. Accepts optional JSON up to 1 MiB; the versioned payload is limited to 512 KiB. Responses are private and not cached.
       tags:
       - Study Drafts
       security:
@@ -224,41 +344,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/StudyDraftCreateInput'
+      parameters: []
 components:
   schemas:
-    StudyDraftCreateInput:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        mode:
-          type: string
-          enum:
-          - quick
-          - custom
-        currentStep:
-          type: string
-        payload:
-          $ref: '#/components/schemas/StudyDraftPayload'
-        idempotencyKey:
-          type: string
-    StudyDraftPayload:
-      type: object
-      required:
-      - version
-      - state
-      additionalProperties: true
-      properties:
-        version:
-          type: integer
-          enum:
-          - 1
-        state:
-          type: object
-          additionalProperties: true
     StudyDraft:
       type: object
       required:
@@ -294,6 +382,13 @@ components:
         revision:
           type: integer
           minimum: 1
+        sourceState:
+          type: string
+          enum:
+          - none
+          - ready
+          - required
+          description: Server assessment on creation, saving and reopening; ready does not replace verification of the submitted rows.
         status:
           type: string
           enum:
@@ -323,6 +418,39 @@ components:
         updatedAt:
           type: string
           format: date-time
+    StudyDraftPayload:
+      type: object
+      required:
+      - version
+      - state
+      additionalProperties: true
+      properties:
+        version:
+          type: integer
+          enum:
+          - 1
+        state:
+          type: object
+          additionalProperties: true
+    StudyDraftCreateInput:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        mode:
+          type: string
+          enum:
+          - quick
+          - custom
+        currentStep:
+          type: string
+        payload:
+          $ref: '#/components/schemas/StudyDraftPayload'
+        idempotencyKey:
+          type: string
   securitySchemes:
     ApiKeyAuth:
       type: http
