@@ -107,3 +107,9 @@ components:
       scheme: bearer
       bearerFormat: API Key
       description: 'Personal API key. Format: `Bearer minds_…_key`. Create one at https://getminds.ai/settings/api-keys.'
+x-provenance:
+  method: harvested
+  publisher: Minds
+  source: https://api.getminds.ai/openapi.json
+  note: split by refine-openapis from the provider's own published document, verified by fetch (openapi/_original/*.fetch.json);
+    stamped by stamp-openapi-provenance.py (roadmap#793)
