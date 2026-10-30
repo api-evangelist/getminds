@@ -1,4 +1,4 @@
-# getminds
+# Minds
 
 <!-- API-EVANGELIST-PROVENANCE:BEGIN -->
 > ### About this repository
@@ -64,4 +64,139 @@
 > Full detail: **[Where this data comes from](https://apievangelist.com/about/where-our-data-comes-from)**
 <!-- API-EVANGELIST-PROVENANCE:END -->
 
-Minds (getminds.ai) is an end-to-end platform for commercial synthetic market research: brand, agency, product and insights teams build reusable AI Audiences grounded in their own research and public sources, then run interviews, questionnaires, concept and message tests, and segment comparisons in one Study. Minds publishes a public v1 REST API (OpenAPI 3.1.0, 103 operations), a hosted MCP server (23 tools, OAuth 2.0 / API key), and an agent integration guide. Operated by Art of X UG (Berlin, Germany) with EU data residency and a GDPR posture.
+Minds (getminds.ai) is an end-to-end platform for commercial synthetic market research. Brand, agency, product and insights teams build reusable AI Audiences grounded in their own research and public sources, then run in-depth interviews, questionnaires, concept and message tests, MaxDiff/conjoint methods, and segment comparisons in a single Study — from audience creation through analysis and export. Minds ships a public v1 REST API (OpenAPI 3.1.0, 103 operations), a hosted MCP server (23 published tools, OAuth 2.0 / API key), and an agent integration guide. Operated by Art of X UG (Berlin, Germany) with EU (Frankfurt/ Stockholm) data residency and a full GDPR posture.
+
+**Areas:** Synthetic Research · Market Research · Surveys · User Research · Marketing Analytics · ai-personas · MCP · Agent-Native · GDPR
+
+## Minds on APIs.io
+
+Everything profiled for Minds is published on APIs.io rather than in this repository. Start at the provider page — **[apis.io/providers/getminds/](https://apis.io/providers/getminds/)** — or go straight to one of the APIs or properties below.
+
+### APIs (15)
+
+- [Minds MCP Server](https://apis.io/apis/getminds/minds-mcp-server/) — Hosted, agent-native MCP server (streamable-http) exposing 23 published tools for creating grounded Audiences, planning and running multi-question Studies,…
+- [Minds Agent Runs API](https://apis.io/apis/getminds/getminds-agent-runs-api/) — The Agent Runs API from Minds — 3 operation(s) for agent runs.
+- [Minds API Keys API](https://apis.io/apis/getminds/getminds-api-keys-api/) — The API Keys API from Minds — 2 operation(s) for api keys.
+- [Minds Audiences API](https://apis.io/apis/getminds/getminds-audiences-api/) — The Audiences API from Minds — 24 operation(s) for audiences.
+- [Minds Auth API](https://apis.io/apis/getminds/getminds-auth-api/) — The Auth API from Minds — 1 operation(s) for auth.
+- [Minds Chat API](https://apis.io/apis/getminds/getminds-chat-api/) — The Chat API from Minds — 4 operation(s) for chat.
+- [Minds Knowledge API](https://apis.io/apis/getminds/getminds-knowledge-api/) — The Knowledge API from Minds — 5 operation(s) for knowledge.
+- [Minds Meta API](https://apis.io/apis/getminds/getminds-meta-api/) — The Meta API from Minds — 1 operation(s) for meta.
+- [Minds Minds API](https://apis.io/apis/getminds/getminds-minds-api/) — The Minds API from Minds — 12 operation(s) for minds.
+- [Minds Models API](https://apis.io/apis/getminds/getminds-models-api/) — The Models API from Minds — 1 operation(s) for models.
+- [Minds Research API](https://apis.io/apis/getminds/getminds-research-api/) — The Research API from Minds — 5 operation(s) for research.
+- [Minds Studies API](https://apis.io/apis/getminds/getminds-studies-api/) — The Studies API from Minds — 18 operation(s) for studies.
+- [Minds Study Drafts API](https://apis.io/apis/getminds/getminds-study-drafts-api/) — The Study Drafts API from Minds — 3 operation(s) for study drafts.
+- [Minds Study Runs API](https://apis.io/apis/getminds/getminds-study-runs-api/) — The Study Runs API from Minds — 1 operation(s) for study runs.
+- [Minds Study Templates API](https://apis.io/apis/getminds/getminds-study-templates-api/) — The Study Templates API from Minds — 3 operation(s) for study templates.
+
+### Published properties
+
+Each property below is a page on APIs.io carrying the machine-readable artifact and what it says.
+
+#### MCP servers (1)
+
+Model Context Protocol servers that expose the API to agents.
+
+- [Minds: Synthetic Market Research](https://apis.io/servers/getminds/minds-ai/)
+
+#### Overlays (1)
+
+OpenAPI overlays, including conversational phrasing for each operation.
+
+- [Getminds Openapi Overlay](https://apis.io/overlays/getminds/getminds-openapi-overlay/)
+
+#### Security (2)
+
+Authentication, trust centre, and vulnerability disclosure.
+
+- [Getminds Authentication](https://apis.io/security/getminds/getminds-authentication/)
+- [Getminds Domain Security](https://apis.io/security/getminds/getminds-domain-security/)
+
+#### OAuth scopes (1)
+
+The permissions the API asks for.
+
+- [Getminds Scopes](https://apis.io/scopes/getminds/getminds-scopes/)
+
+#### Plans and pricing (1)
+
+Published plans, tiers and prices.
+
+- [Getminds Plans Pricing](https://apis.io/plans/getminds/getminds-plans-pricing/)
+
+#### Rate limits (1)
+
+Published request limits.
+
+- [Getminds Rate Limits](https://apis.io/rate-limits/getminds/getminds-rate-limits/)
+
+## Where to find this API
+
+Links to the company's own pages. This repository publishes no copy of their specifications — the canonical document is theirs and lives at the URLs below.
+
+- [Website](https://getminds.ai)
+- [Documentation](https://getminds.ai/docs/api/overview)
+- [Getting started](https://getminds.ai/docs/api/overview)
+- [API reference](https://getminds.ai/docs/api/reference)
+- [Pricing](https://getminds.ai/pricing)
+- [Sign up](https://getminds.ai/settings/api-keys)
+- [Support](https://getminds.ai/guide)
+- [Blog](https://getminds.ai/blog)
+- [Terms of service](https://getminds.ai/legal/terms)
+- [Privacy policy](https://getminds.ai/legal/dataprivacy)
+
+## API Evangelist rating
+
+**Kin Score 58.4** — strong · rubric 0.25.0 · scored 2026-10-23
+
+| Facet | Score |
+|---|---|
+| Discoverability | 75.0 |
+| Contract quality | 51.9 |
+| Contract governance | 18.2 |
+| Operational transparency | 36.8 |
+| Developer ergonomics | 58.9 |
+| Access clarity | 76.3 |
+
+**Agent readiness 61.6** — agent-native
+
+| Agent-readiness dimension | Result |
+|---|---|
+| Spec Presence | yes |
+| Agentic Access | — |
+| Reversibility Documented | verified |
+| MCP Server | documented (partial credit) |
+| Auth Clarity | served (partial credit) |
+| Idempotency | verified |
+| Error Semantics | verified |
+| OpenAPI Examples | partial |
+| Rate Limit Signal | verified |
+| Event Surface Described | — |
+| Agent Skills | derived (partial credit) |
+| Well Known Catalog | yes |
+| Consent Identity | — |
+| Agent Card | — |
+| Dry Run Mode | — |
+| Delegated Identity | served (partial credit) |
+| Protected Resource Metadata | verified |
+| Dynamic Client Registration | yes |
+| Agentic Commerce | — |
+| Pagination Ratio | — |
+| Operation Distinctiveness | distinct |
+
+**Regulatory alignment 46.1** — Horizontal (data, software, accessibility, platform)
+
+The rubric is published at [github.com/api-evangelist/kin-score](https://github.com/api-evangelist/kin-score). The per-check breakdown behind these numbers — which checks were earned, partial or missed — along with score history and how this provider compares to its peers, is available at [apis.io/providers/getminds/](https://apis.io/providers/getminds/).
+
+## How this profile is made
+
+API Evangelist profiles a company's public API surface the way a developer would find it: the website, developer portal and documentation, the specifications it publishes, its public repositories, and its pricing, status and changelog pages. From that it derives the properties above — contracts split per API, workflows, schemas, collections, governance rules, plans and rate limits — and scores them against the published [Kin Score rubric](https://github.com/api-evangelist/kin-score).
+
+The artifacts are published on [APIs.io](https://apis.io), not in this repository. This repository is the public record for Minds: the place to say something is wrong, missing or out of date, and to ask for a re-score or a removal.
+
+## Open an issue
+
+- **Something about this listing** — a wrong description, a missing API, a stale artifact or a question about the rating: [open an issue on this repository](https://github.com/api-evangelist/getminds/issues/new).
+- **A new API, or one that is not in the catalog yet** — [submit it on APIs.io](https://apis.io/add/).
+- **Anything else** — [the APIs.io inbox](https://github.com/api-search/inbox/issues/new) or [info@apievangelist.com](mailto:info@apievangelist.com).
